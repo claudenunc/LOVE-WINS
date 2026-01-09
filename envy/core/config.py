@@ -14,7 +14,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     """
-    ENVY System Configuration
+    ENVY System C    python -c "from envy.core.config import settings; print('GROQ:', settings.has_groq, 'OPENROUTER:', settings.has_openrouter, 'DIFY:', settings.has_dify)"onfiguration
     
     All settings can be overridden via environment variables.
     """
@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     # Resource limits
     max_daily_cost_usd: float = Field(default=10.0, env="MAX_DAILY_COST_USD")
     max_tokens_per_session: int = Field(default=20000, env="MAX_TOKENS_PER_SESSION")
+    # Guardrail / agent limits
+    max_iterations_per_task: int = Field(default=10, env="MAX_ITERATIONS_PER_TASK")
+    max_agent_spawns: int = Field(default=5, env="MAX_AGENT_SPAWNS")
+    max_reflexion_attempts: int = Field(default=3, env="MAX_REFLEXION_ATTEMPTS")
+    max_task_cost_usd: float = Field(default=5.0, env="MAX_TASK_COST_USD")
+    session_timeout_minutes: int = Field(default=120, env="SESSION_TIMEOUT_MINUTES")
     
     @model_validator(mode='after')
     def clean_api_keys(self):
