@@ -125,18 +125,40 @@ async def upload_file(file: Request):
 
 # --- Subscription (Stripe) ---
 
+STRIPE_ENABLED = False # Set to True when ready to enable payments
+
 @app.post("/api/subscribe")
 async def create_checkout(user: dict = Depends(get_current_user)):
-    """Create Stripe Checkout Session"""
+    """Create Stripe Checkout Session (Standby Mode)"""
+    if not STRIPE_ENABLED:
+        return {"url": "#", "message": "Subscription system is in standby mode."}
+        
     stripe_key = os.getenv("STRIPE_SECRET_KEY")
     if not stripe_key:
-        return {"url": "#", "error": "Stripe not configured"}
+        return {"url": "#", "error": "Stripe keys not found in environment."}
     
-    # Real implementation would import stripe and create session
-    # stripe.api_key = stripe_key
-    # session = stripe.checkout.Session.create(...)
+    import stripe
+    stripe.api_key = stripe_key
     
-    return {"url": "https://checkout.stripe.com/mock-session"}
+    try:
+        # Note: You need to create a Price ID in your Stripe Dashboard first
+        price_id = os.getenv("STRIPE_PRICE_ID", "price_default")
+        
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price': price_id,
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=f"{settings.app_url}/?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.app_url}/",
+            customer_email=user.get("email"),
+            client_reference_id=user.get("id")
+        )
+        return {"url": session.url}
+    except Exception as e:
+        return {"url": "#", "error": str(e)}
 
 # --- History Management ---
 
