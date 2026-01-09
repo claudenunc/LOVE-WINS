@@ -156,7 +156,7 @@ class LLMClient:
         """Call Groq API"""
         
         headers = {
-            "Authorization": f"Bearer {self.settings.groq_api_key}",
+            "Authorization": f"Bearer {self.settings.groq_api_key.strip()}",
             "Content-Type": "application/json"
         }
         
@@ -215,7 +215,7 @@ class LLMClient:
         """Call OpenRouter API"""
         
         headers = {
-            "Authorization": f"Bearer {self.settings.openrouter_api_key}",
+            "Authorization": f"Bearer {self.settings.openrouter_api_key.strip()}",
             "HTTP-Referer": "https://love-wins.ai",
             "X-Title": "ENVY Self-Improving Agent",
             "Content-Type": "application/json"

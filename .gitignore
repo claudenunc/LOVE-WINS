@@ -53,6 +53,7 @@ htmlcov/
 /memory/
 *.json
 !package.json
+!static/manifest.json
 
 # Logs
 *.log

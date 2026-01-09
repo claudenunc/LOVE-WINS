@@ -1,0 +1,16 @@
+{
+    "name": "Foolishness ENVY",
+    "short_name": "ENVY",
+    "description": "The Polymorphic Companion",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#09090b",
+    "theme_color": "#09090b",
+    "icons": [
+        {
+            "src": "/static/icon.svg",
+            "type": "image/svg+xml",
+            "sizes": "any"
+        }
+    ]
+}
