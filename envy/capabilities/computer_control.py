@@ -10,7 +10,7 @@ except ImportError:
 try:
     import ollama
 except ImportError:
-    ollama = None
+    from .ollama_mock import ollama
 
 try:
     from interpreter import interpreter
