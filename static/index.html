@@ -120,22 +120,84 @@
 
     <script>
         // --- AUTH LOGIC ---
-        // Placeholder for Supabase Config (Render will inject via ENV if configured properly, but for static HTML we need a proxy)
-        // For this "Founder Mode" fix, we will simulate Auth if Supabase keys aren't explicitly in HTML.
-        // In a real production app, we fetch these from an endpoint.
-        
+        let supabase = null;
+        let isSignup = false;
+
         const loginBtn = document.getElementById('login-btn');
+        const signupToggle = document.getElementById('signup-toggle');
         const authScreen = document.getElementById('auth-screen');
         const appScreen = document.getElementById('app-screen');
         const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const authTitle = document.querySelector('#auth-screen h2');
 
-        // Simple local auth simulation to get you IN immediately
-        loginBtn.addEventListener('click', () => {
+        // 1. Initialize
+        async function initApp() {
+            try {
+                const res = await fetch('/api/config');
+                const config = await res.json();
+                if (config.supabase_url && config.supabase_anon_key) {
+                    supabase = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+                    
+                    // Check active session
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session) {
+                        enterApp(session.user.email);
+                    }
+                } else {
+                    console.warn("Supabase not configured. Using mock auth.");
+                }
+            } catch (e) {
+                console.error("Failed to load config:", e);
+            }
+        }
+        initApp();
+
+        // 2. Toggle Mode
+        signupToggle.addEventListener('click', () => {
+            isSignup = !isSignup;
+            authTitle.innerText = isSignup ? "Create Account" : "Welcome to ENVY";
+            loginBtn.innerText = isSignup ? "Sign Up" : "Sign In";
+            signupToggle.innerText = isSignup ? "Already have an account? Sign In" : "Need an account? Sign Up";
+        });
+
+        // 3. Auth Action
+        loginBtn.addEventListener('click', async () => {
             const email = emailInput.value;
-            if(email) {
+            const password = passwordInput.value;
+            
+            if (!email || !password) {
+                alert("Please enter email and password");
+                return;
+            }
+
+            loginBtn.disabled = true;
+            loginBtn.innerText = "Processing...";
+
+            if (supabase) {
+                try {
+                    if (isSignup) {
+                        const { data, error } = await supabase.auth.signUp({ email, password });
+                        if (error) throw error;
+                        alert("Account created! Please sign in.");
+                        isSignup = false; // Switch back to login
+                        signupToggle.click(); // Trigger UI update
+                    } else {
+                        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+                        if (error) throw error;
+                        enterApp(email);
+                    }
+                } catch (e) {
+                    alert(e.message);
+                }
+            } else {
+                // Mock fallback
                 localStorage.setItem('envy_user', email);
                 enterApp(email);
             }
+            
+            loginBtn.disabled = false;
+            loginBtn.innerText = isSignup ? "Sign Up" : "Sign In";
         });
 
         function enterApp(email) {
@@ -144,10 +206,6 @@
             document.getElementById('user-email').innerText = email;
             loadHistory();
         }
-
-        // Check session
-        const savedUser = localStorage.getItem('envy_user');
-        if(savedUser) enterApp(savedUser);
 
         // --- CHAT LOGIC ---
         const userInput = document.getElementById('user-input');
@@ -180,9 +238,19 @@
             addMessageSkeleton('ai', aiId);
 
             try {
+                // Get JWT if available
+                let token = '';
+                if (supabase) {
+                    const { data } = await supabase.auth.getSession();
+                    token = data.session?.access_token || '';
+                }
+
                 const response = await fetch('/v1/chat/completions/stream', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         model: 'envy',
                         messages: [{ role: 'user', content: text }],
@@ -212,7 +280,8 @@
                                     // Artifact detection (Simplified for speed)
                                     if(fullText.includes('```')) {
                                         document.getElementById('artifact-panel').classList.remove('hidden');
-                                        document.getElementById('artifact-content').innerHTML = `<pre class="p-4 text-sm text-gray-300 font-mono">${fullText}</pre>`; // Rough rendering
+                                        const codeContent = fullText.match(/```([\s\S]*?)```/)?.[1] || fullText;
+                                        document.getElementById('artifact-content').innerHTML = `<pre class="p-4 text-sm text-gray-300 font-mono">${codeContent}</pre>`;
                                     }
                                     
                                     aiDiv.innerHTML = marked.parse(fullText);
@@ -224,6 +293,7 @@
                 }
             } catch(e) {
                 console.error(e);
+                document.getElementById(aiId).innerHTML = `<div class="text-red-500">Connection Error</div>`;
             }
         }
 

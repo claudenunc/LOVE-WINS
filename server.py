@@ -101,6 +101,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # API Endpoints
 # ===================================
 
+# ===================================
+# Config Endpoint
+# ===================================
+
+@app.get("/api/config")
+async def get_config():
+    """Serve public config to frontend"""
+    return {
+        "supabase_url": settings.supabase_url,
+        "supabase_anon_key": settings.supabase_anon_key
+    }
+
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
