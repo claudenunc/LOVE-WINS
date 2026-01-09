@@ -323,6 +323,21 @@
             currentArtifactId: null
         };
 
+        // --- UTILITY FUNCTIONS ---
+        /**
+         * Validate that a value is a valid UUID or valid project ID
+         * @param {string} value - The value to validate
+         * @returns {boolean} - True if valid, false otherwise
+         */
+        function isValidProjectId(value) {
+            if (!value || value === 'undefined' || value === 'null' || typeof value !== 'string') {
+                return false;
+            }
+            // UUID v4 pattern (with some flexibility)
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            return uuidPattern.test(value);
+        }
+
         // --- DOM ELEMENTS ---
         const els = {
             input: document.getElementById('user-input'),
@@ -349,7 +364,13 @@
                         body: JSON.stringify({name: 'Default Project', description: 'Auto-created'})
                     });
                     data = await res.json();
-                    await fetch('/api/projects/' + data.id + '/activate', {method: 'POST'});
+                    
+                    // Validate project ID before activating
+                    if (isValidProjectId(data.id)) {
+                        await fetch('/api/projects/' + data.id + '/activate', {method: 'POST'});
+                    } else {
+                        console.error('Cannot activate project: Invalid project ID', data.id);
+                    }
                 } else {
                     state.activeProject = data; // Ensure correct structure
                 }
@@ -370,6 +391,12 @@
         }
         
         async function loadProjectFiles(projectId) {
+            // Validate project ID before making API call
+            if (!isValidProjectId(projectId)) {
+                console.error('Cannot load project files: Invalid project ID', projectId);
+                return;
+            }
+            
             try {
                 const res = await fetch(`/api/projects/${projectId}/files`);
                 const data = await res.json();
@@ -685,6 +712,14 @@
         
         async function uploadProjectFile(e) {
             if (!state.activeProject) return alert("No active project");
+            
+            // Validate project ID before making API call
+            if (!isValidProjectId(state.activeProject.id)) {
+                console.error('Cannot upload file: Invalid project ID', state.activeProject.id);
+                alert("Error: Invalid project ID. Please refresh and try again.");
+                return;
+            }
+            
             const files = e.target.files;
             
             for (let i=0; i<files.length; i++) {

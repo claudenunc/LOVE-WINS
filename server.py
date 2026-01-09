@@ -25,6 +25,7 @@ import asyncio
 from typing import Optional, List, Dict, Any, AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse, HTMLResponse
@@ -242,6 +243,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ===================================
+# UTILITY FUNCTIONS
+# ===================================
+
+def validate_uuid(value: str, param_name: str = "ID") -> None:
+    """
+    Validate that a string is a valid UUID format.
+    Raises HTTPException with 400 status code if invalid.
+    
+    Args:
+        value: The string to validate as UUID
+        param_name: Name of the parameter for error message
+    
+    Raises:
+        HTTPException: 400 Bad Request if the value is not a valid UUID
+    """
+    try:
+        UUID(value)
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {param_name} format: '{value}'. Expected a valid UUID."
+        )
 
 # ===================================
 # HEALTH & STATUS
@@ -701,6 +726,9 @@ async def get_project(project_id: str):
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
     
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
+    
     project = await project_manager.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -729,6 +757,9 @@ async def update_project(project_id: str, request: UpdateProjectRequest):
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
     
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
+    
     settings_obj = None
     if request.settings:
         settings_obj = ProjectSettings(**request.settings)
@@ -752,6 +783,9 @@ async def delete_project(project_id: str):
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
     
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
+    
     if await project_manager.delete_project(project_id):
         return {"deleted": True}
     raise HTTPException(status_code=404, detail="Project not found")
@@ -761,6 +795,9 @@ async def archive_project(project_id: str):
     """Archive a project"""
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
+    
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
     
     project = await project_manager.archive_project(project_id)
     if not project:
@@ -773,6 +810,9 @@ async def activate_project(project_id: str):
     """Set a project as the active project"""
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
+    
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
     
     project = await project_manager.get_project(project_id)
     if not project:
@@ -787,6 +827,9 @@ async def add_project_file(project_id: str, request: AddFileRequest):
     """Add a file to a project"""
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
+    
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
     
     pf = await project_manager.add_file(
         project_id=project_id,
@@ -812,6 +855,9 @@ async def list_project_files(project_id: str):
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
     
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
+    
     files = await project_manager.list_files(project_id)
     return {"files": files}
 
@@ -820,6 +866,9 @@ async def get_project_file(project_id: str, file_path: str):
     """Get a specific file from a project"""
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
+    
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
     
     pf = await project_manager.get_file(project_id, file_path)
     if not pf:
@@ -842,6 +891,9 @@ async def delete_project_file(project_id: str, file_path: str):
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
     
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
+    
     if await project_manager.delete_file(project_id, file_path):
         return {"deleted": True}
     raise HTTPException(status_code=404, detail="File not found")
@@ -852,6 +904,9 @@ async def get_project_context(project_id: str):
     """Get project context for LLM injection"""
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
+    
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
     
     context_prompt = await project_manager.build_context_prompt(project_id)
     files = await project_manager.get_context_files(project_id)
@@ -868,6 +923,9 @@ async def update_project_context(project_id: str, request: UpdateContextRequest)
     """Manually set which files are in context"""
     if not project_manager:
         raise HTTPException(status_code=503, detail="Project manager not initialized")
+    
+    # Validate UUID format
+    validate_uuid(project_id, "project ID")
     
     project = await project_manager.update_context_snapshot(project_id, request.file_paths)
     if not project:
