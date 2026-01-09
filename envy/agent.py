@@ -152,8 +152,8 @@ class ENVY:
         self.code_control = CodeController(local_mode=True)  # Open Interpreter (Local/Private)
         
         # 3. The Face & Voice: XTTS-v2 & LivePortrait
-        self.voice = VoiceSynthesizer(model="xtts-v2")
-        self.avatar = AvatarAnimator(engine="liveportrait")
+        self.voice = VoiceSynthesizer()
+        self.avatar = AvatarAnimator()
         
         # Set default persona to the Polymorphic Companion
         self.current_persona = PERSONAS.get("omni_link")
