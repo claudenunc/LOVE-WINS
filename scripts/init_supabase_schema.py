@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-SQL_FILE = Path(__file__).resolve().parent.parent / "migrations" / "0001_create_projects.sql"
+MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 
 
 def main():
@@ -27,22 +27,30 @@ def main():
         print("ERROR: psycopg2 is required. Install with: pip install psycopg2-binary")
         sys.exit(1)
 
-    if not SQL_FILE.exists():
-        print(f"ERROR: migration file not found: {SQL_FILE}")
+    if not MIGRATIONS_DIR.exists():
+        print(f"ERROR: migrations directory not found: {MIGRATIONS_DIR}")
         sys.exit(1)
 
-    sql = SQL_FILE.read_text()
+    sql_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    if not sql_files:
+        print("No migration files found in migrations/")
+        sys.exit(0)
 
     try:
         conn = psycopg2.connect(database_url)
         conn.autocommit = True
         cur = conn.cursor()
-        cur.execute(sql)
+
+        for f in sql_files:
+            print(f"Running migration: {f.name}")
+            sql = f.read_text()
+            cur.execute(sql)
+
         cur.close()
         conn.close()
-        print("Migration executed successfully.")
+        print("All migrations executed successfully.")
     except Exception as e:
-        print("Failed to execute migration:", e)
+        print("Failed to execute migrations:", e)
         sys.exit(1)
 
 
