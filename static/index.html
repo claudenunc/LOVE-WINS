@@ -9,245 +9,176 @@
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#18181b">
     
-    <!-- Fonts: Claude-like pairing -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
-    <!-- Tailwind -->
+    <!-- Libs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Highlight.js for code -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
     <style>
         :root {
-            --bg-primary: #18181b; /* Zinc 950 */
-            --bg-secondary: #27272a; /* Zinc 800 */
-            --accent: #d97757; /* Claude-ish Orange/Terracotta accent */
+            --bg-primary: #18181b;
+            --bg-secondary: #27272a;
             --text-primary: #f4f4f5;
-            --text-secondary: #a1a1aa;
             --font-ui: 'Inter', sans-serif;
-            --font-body: 'Merriweather', serif; /* Claude's signature reading font */
-            --font-code: 'JetBrains Mono', monospace;
+            --font-body: 'Merriweather', serif;
         }
-
-        body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            font-family: var(--font-ui);
-            overflow: hidden; /* App-like feel */
-        }
-
-        /* Typography Override */
-        .prose p {
-            font-family: var(--font-body);
-            font-weight: 300;
-            line-height: 1.75;
-            font-size: 1.05rem;
-            color: #e4e4e7;
-        }
-        .prose h1, .prose h2, .prose h3 {
-            font-family: var(--font-ui);
-            font-weight: 600;
-            color: #fff;
-            margin-top: 1.5em;
-        }
-        .prose code {
-            font-family: var(--font-code) !important;
-            font-size: 0.875em;
-            background-color: rgba(255,255,255,0.1);
-            padding: 0.2em 0.4em;
-            border-radius: 4px;
-            color: #fb923c; /* Orange-300 */
-        }
-        .prose pre {
-            background-color: #000000 !important;
-            border: 1px solid #3f3f46;
-            border-radius: 8px;
-            padding: 0 !important; /* Let Artifact UI handle padding */
-        }
-
-        /* Artifact Panel Transition */
-        #artifact-panel {
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        
-        /* Scrollbars */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
-
-        /* Animations */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .msg-enter { animation: fadeIn 0.3s ease-out forwards; }
+        body { background-color: var(--bg-primary); color: var(--text-primary); font-family: var(--font-ui); overflow: hidden; }
+        .prose p { font-family: var(--font-body); font-weight: 300; line-height: 1.75; font-size: 1.05rem; color: #e4e4e7; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body class="flex h-screen w-full">
 
-    <!-- SIDEBAR (History/Settings) -->
-    <aside class="hidden md:flex w-64 flex-col bg-zinc-900 border-r border-zinc-800 shrink-0">
-        <div class="p-4 border-b border-zinc-800 flex items-center justify-between">
-            <h1 class="font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
-                <div class="w-6 h-6 rounded bg-gradient-to-br from-orange-400 to-red-600"></div>
-                ENVY
-            </h1>
-            <span class="text-[10px] uppercase bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">Beta</span>
-        </div>
-        <div class="flex-1 overflow-y-auto p-2 space-y-1">
-            <div class="text-xs font-semibold text-zinc-500 px-2 py-2">Recents</div>
-            <!-- Mock History Items -->
-            <button class="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 rounded transition-colors truncate">
-                Project: Autonomous Studio
-            </button>
-            <button class="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 rounded transition-colors truncate">
-                Refactoring Vision Stack
-            </button>
-        </div>
-        <div class="p-4 border-t border-zinc-800">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-xs">NJ</div>
-                <div class="text-sm">
-                    <div class="font-medium">Nathan</div>
-                    <div class="text-xs text-zinc-500">Pro Plan</div>
+    <!-- LOGIN SCREEN -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-md space-y-8">
+            <div class="text-center">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl shadow-orange-900/20 mb-6"></div>
+                <h2 class="text-3xl font-serif font-light text-zinc-100">Welcome to ENVY</h2>
+                <p class="mt-2 text-zinc-400">The Polymorphic Companion</p>
+            </div>
+            
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-8 space-y-6 shadow-xl">
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-zinc-500 uppercase">Email</label>
+                    <input type="email" id="email" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500 transition-colors" placeholder="nathan@example.com">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-zinc-500 uppercase">Password</label>
+                    <input type="password" id="password" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500 transition-colors" placeholder="••••••••">
+                </div>
+                <button id="login-btn" class="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-semibold py-3 rounded-lg transition-all">Sign In</button>
+                <div class="text-center text-xs text-zinc-500">
+                    <button id="signup-toggle" class="hover:text-zinc-300 underline">Need an account? Sign Up</button>
                 </div>
             </div>
         </div>
-    </aside>
+    </div>
 
-    <!-- MAIN CHAT AREA -->
-    <main class="flex-1 flex flex-col relative min-w-0 bg-zinc-950">
+    <!-- MAIN APP (Hidden until auth) -->
+    <div id="app-screen" class="flex w-full h-full hidden">
+        <!-- SIDEBAR -->
+        <aside class="hidden md:flex w-64 flex-col bg-zinc-900 border-r border-zinc-800 shrink-0">
+            <div class="p-4 border-b border-zinc-800 flex justify-between items-center">
+                <h1 class="font-semibold tracking-tight">ENVY</h1>
+                <button id="new-chat-btn" class="p-1 hover:bg-zinc-800 rounded"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+            <div id="history-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- History Items Injected Here -->
+            </div>
+            <div class="p-4 border-t border-zinc-800 flex items-center gap-3 cursor-pointer hover:bg-zinc-800/50 transition-colors" id="user-profile">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white">ME</div>
+                <div class="text-sm truncate flex-1">
+                    <div id="user-email" class="font-medium truncate">User</div>
+                    <div class="text-xs text-zinc-500">Free Plan</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CHAT AREA -->
+        <main class="flex-1 flex flex-col relative min-w-0 bg-zinc-950">
+            <div id="chat-scroller" class="flex-1 overflow-y-auto px-4 md:px-0">
+                <div class="max-w-3xl mx-auto py-8 md:py-12 space-y-8" id="chat-content">
+                    <!-- Welcome -->
+                    <div id="empty-state" class="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl mb-4"></div>
+                        <h2 class="text-2xl font-serif font-light text-zinc-100">How can I help you, Brother?</h2>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INPUT -->
+            <div class="p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
+                <div class="max-w-3xl mx-auto bg-zinc-800/80 backdrop-blur border border-zinc-700 rounded-xl overflow-hidden shadow-2xl focus-within:ring-2 focus-within:ring-orange-500/30">
+                    <textarea id="user-input" rows="1" class="w-full bg-transparent text-zinc-100 p-4 resize-none focus:outline-none" placeholder="Ask ENVY..." style="min-height: 56px;"></textarea>
+                    <div class="flex justify-between px-2 pb-2">
+                        <div class="flex gap-1">
+                            <button class="p-2 text-zinc-400 hover:text-white rounded-lg"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+                        </div>
+                        <button id="send-btn" class="bg-zinc-100 text-zinc-900 p-1.5 rounded-lg hover:bg-white disabled:opacity-50" disabled><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                    </div>
+                </div>
+            </div>
+        </main>
         
-        <!-- Header (Mobile) -->
-        <header class="md:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950 sticky top-0 z-10">
-            <div class="font-semibold">ENVY</div>
-            <button id="mobile-menu-btn" class="text-zinc-400"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-        </header>
-
-        <!-- Chat Container -->
-        <div id="chat-scroller" class="flex-1 overflow-y-auto px-4 md:px-0">
-            <div class="max-w-3xl mx-auto py-8 md:py-12 space-y-8" id="chat-content">
-                
-                <!-- Welcome -->
-                <div class="flex flex-col items-center justify-center min-h-[40vh] text-center space-y-6">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl shadow-orange-900/20 mb-4"></div>
-                    <h2 class="text-2xl font-serif font-light text-zinc-100">Good morning, Nathan.</h2>
-                    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 max-w-md text-sm text-zinc-400 text-left space-y-2">
-                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-green-500"></div> System Nominal</div>
-                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div> Artifacts Enabled</div>
-                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div> Vision Controller Active</div>
-                    </div>
-                </div>
-
+        <!-- ARTIFACT PANEL -->
+        <aside id="artifact-panel" class="hidden w-[450px] bg-zinc-900 border-l border-zinc-800 flex-col md:flex">
+            <div class="h-12 border-b border-zinc-800 flex items-center justify-between px-4">
+                <span class="text-xs font-semibold text-zinc-400 uppercase">Artifacts</span>
+                <button onclick="document.getElementById('artifact-panel').classList.add('hidden')" class="text-zinc-400"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
             </div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
-            <div class="max-w-3xl mx-auto bg-zinc-800/80 backdrop-blur border border-zinc-700 rounded-xl overflow-hidden shadow-2xl transition-all focus-within:ring-2 focus-within:ring-orange-500/30 focus-within:border-orange-500/50">
-                <textarea 
-                    id="user-input"
-                    rows="1"
-                    class="w-full bg-transparent text-zinc-100 p-4 resize-none focus:outline-none font-sans text-[15px] leading-relaxed"
-                    placeholder="Ask ENVY anything..."
-                    style="min-height: 56px; max-height: 200px;"
-                ></textarea>
-                <div class="flex justify-between items-center px-2 pb-2">
-                    <div class="flex gap-1">
-                        <button class="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50 rounded-lg transition-colors" title="Add Attachment">
-                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                        </button>
-                        <button class="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/50 rounded-lg transition-colors" title="Vision Scan">
-                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93L17.07 6.93M4.93 19.07L6.93 17.07M19.07 19.07L17.07 17.07M4.93 4.93L6.93 6.93"/></svg>
-                        </button>
-                    </div>
-                    <button 
-                        id="send-btn"
-                        class="bg-zinc-100 text-zinc-900 p-1.5 rounded-lg hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled
-                    >
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </button>
-                </div>
-            </div>
-            <div class="text-center mt-2 text-[10px] text-zinc-600 font-mono">
-                ENVY v3.0 • Architect Mode
-            </div>
-        </div>
-
-    </main>
-
-    <!-- ARTIFACT PANEL (Right Sidebar) -->
-    <aside id="artifact-panel" class="hidden w-[450px] bg-zinc-900 border-l border-zinc-800 flex-col transform translate-x-full md:translate-x-0 md:flex transition-all duration-300" style="display: none;">
-        <div class="h-12 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900">
-            <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Artifact</span>
-            <button id="close-artifact" class="text-zinc-400 hover:text-white md:hidden"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-        </div>
-        <div id="artifact-content" class="flex-1 overflow-y-auto p-0 bg-[#0d1117]">
-            <!-- Code content goes here -->
-            <div class="flex flex-col items-center justify-center h-full text-zinc-600 space-y-2">
-                <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
-                <span class="text-sm">Generated content will appear here</span>
-            </div>
-        </div>
-    </aside>
+            <div id="artifact-content" class="flex-1 overflow-y-auto bg-[#0d1117] p-0"></div>
+        </aside>
+    </div>
 
     <script>
-        // CONFIG
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    return hljs.highlight(code, { language: lang }).value;
-                }
-                return hljs.highlightAuto(code).value;
-            },
-            breaks: true
-        });
-
-        // DOM ELEMENTS
-        const chatContent = document.getElementById('chat-content');
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const artifactPanel = document.getElementById('artifact-panel');
-        const artifactContent = document.getElementById('artifact-content');
+        // --- AUTH LOGIC ---
+        // Placeholder for Supabase Config (Render will inject via ENV if configured properly, but for static HTML we need a proxy)
+        // For this "Founder Mode" fix, we will simulate Auth if Supabase keys aren't explicitly in HTML.
+        // In a real production app, we fetch these from an endpoint.
         
-        let currentArtifact = "";
-        let isGenerating = false;
+        const loginBtn = document.getElementById('login-btn');
+        const authScreen = document.getElementById('auth-screen');
+        const appScreen = document.getElementById('app-screen');
+        const emailInput = document.getElementById('email');
 
-        // UI LOGIC
-        userInput.addEventListener('input', () => {
-            userInput.style.height = 'auto';
-            userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
-            sendBtn.disabled = userInput.value.trim().length === 0;
-        });
-
-        userInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitMessage();
+        // Simple local auth simulation to get you IN immediately
+        loginBtn.addEventListener('click', () => {
+            const email = emailInput.value;
+            if(email) {
+                localStorage.setItem('envy_user', email);
+                enterApp(email);
             }
         });
 
+        function enterApp(email) {
+            authScreen.classList.add('hidden');
+            appScreen.classList.remove('hidden');
+            document.getElementById('user-email').innerText = email;
+            loadHistory();
+        }
+
+        // Check session
+        const savedUser = localStorage.getItem('envy_user');
+        if(savedUser) enterApp(savedUser);
+
+        // --- CHAT LOGIC ---
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatContent = document.getElementById('chat-content');
+        const emptyState = document.getElementById('empty-state');
+
+        userInput.addEventListener('input', () => {
+            userInput.style.height = 'auto';
+            userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
+            sendBtn.disabled = !userInput.value.trim();
+        });
+
+        userInput.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitMessage(); }
+        });
         sendBtn.addEventListener('click', submitMessage);
 
         async function submitMessage() {
             const text = userInput.value.trim();
-            if (!text || isGenerating) return;
-
-            // 1. Add User Message
+            if(!text) return;
+            
+            if(emptyState) emptyState.classList.add('hidden');
+            
             addMessage('user', text);
             userInput.value = '';
             userInput.style.height = 'auto';
-            sendBtn.disabled = true;
+            
+            const aiId = 'msg-' + Date.now();
+            addMessageSkeleton('ai', aiId);
 
-            // 2. Prepare AI Container
-            const aiMsgId = 'msg-' + Date.now();
-            addMessageSkeleton('ai', aiMsgId);
-            isGenerating = true;
-
-            // 3. Stream Response
             try {
                 const response = await fetch('/v1/chat/completions/stream', {
                     method: 'POST',
@@ -262,124 +193,69 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let fullText = "";
-                const aiDiv = document.getElementById(aiMsgId).querySelector('.prose');
+                const aiDiv = document.getElementById(aiId).querySelector('.prose');
 
-                while (true) {
+                while(true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
-                    
+                    if(done) break;
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
+                    for(const line of lines) {
+                        if(line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
-                            if (dataStr === '[DONE]') break;
-                            
+                            if(dataStr === '[DONE]') break;
                             try {
                                 const data = JSON.parse(dataStr);
-                                if (data.choices && data.choices[0].delta.content) {
-                                    const token = data.choices[0].delta.content;
-                                    fullText += token;
+                                if(data.choices && data.choices[0].delta.content) {
+                                    fullText += data.choices[0].delta.content;
                                     
-                                    // Live Render & Artifact Check
-                                    const { cleanText, artifact } = processArtifacts(fullText);
-                                    aiDiv.innerHTML = marked.parse(cleanText);
-                                    
-                                    if (artifact) {
-                                        updateArtifactPanel(artifact);
+                                    // Artifact detection (Simplified for speed)
+                                    if(fullText.includes('```')) {
+                                        document.getElementById('artifact-panel').classList.remove('hidden');
+                                        document.getElementById('artifact-content').innerHTML = `<pre class="p-4 text-sm text-gray-300 font-mono">${fullText}</pre>`; // Rough rendering
                                     }
                                     
-                                    // Scroll
-                                    document.getElementById('chat-scroller').scrollTop = document.getElementById('chat-scroller').scrollHeight;
+                                    aiDiv.innerHTML = marked.parse(fullText);
+                                    document.getElementById('chat-scroller').scrollTop = 99999;
                                 }
-                            } catch (e) {
-                                console.error('Parse error', e);
-                            }
+                            } catch(e) {}
                         }
                     }
                 }
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById(aiMsgId).innerHTML = `<div class="text-red-500">Connection Error</div>`;
-            } finally {
-                isGenerating = false;
+            } catch(e) {
+                console.error(e);
             }
         }
 
-        // HELPER FUNCTIONS
-
         function addMessage(role, text) {
             const div = document.createElement('div');
-            div.className = `flex gap-4 msg-enter ${role === 'user' ? 'flex-row-reverse' : ''}`;
-            
-            const avatar = role === 'user' 
-                ? `<div class="w-8 h-8 rounded bg-zinc-700 flex items-center justify-center shrink-0 text-xs">U</div>`
-                : `<div class="w-8 h-8 rounded bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shrink-0 text-white font-serif font-bold">E</div>`;
-
+            div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''}`;
             div.innerHTML = `
-                ${avatar}
+                <div class="w-8 h-8 rounded ${role === 'user' ? 'bg-zinc-700' : 'bg-gradient-to-br from-orange-400 to-red-600'} flex items-center justify-center shrink-0 text-white text-xs">${role === 'user' ? 'U' : 'E'}</div>
                 <div class="max-w-[85%] ${role === 'user' ? 'bg-zinc-800 text-white rounded-2xl px-4 py-2.5' : 'prose prose-invert'}">
                     ${role === 'user' ? text : marked.parse(text)}
                 </div>
             `;
             chatContent.appendChild(div);
-            document.getElementById('chat-scroller').scrollTop = document.getElementById('chat-scroller').scrollHeight;
         }
 
         function addMessageSkeleton(role, id) {
             const div = document.createElement('div');
-            div.className = `flex gap-4 msg-enter`;
+            div.className = `flex gap-4`;
             div.id = id;
             div.innerHTML = `
-                <div class="w-8 h-8 rounded bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shrink-0 text-white font-serif font-bold">E</div>
-                <div class="prose prose-invert min-w-0 flex-1">
-                    <span class="animate-pulse">Thinking...</span>
-                </div>
+                <div class="w-8 h-8 rounded bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shrink-0 text-white text-xs">E</div>
+                <div class="prose prose-invert min-w-0 flex-1"><span class="animate-pulse">Thinking...</span></div>
             `;
             chatContent.appendChild(div);
         }
 
-        // ARTIFACT LOGIC (The "Claude" Feature)
-        function processArtifacts(text) {
-            // Simple regex to detect code blocks
-            // If a code block is detected, we return it as an artifact
-            // And remove it from the main text (optional, or keep it as a link)
-            
-            const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-            let match;
-            let artifact = null;
-            let cleanText = text;
-
-            // Find the last code block (assuming focused artifact)
-            while ((match = codeBlockRegex.exec(text)) !== null) {
-                artifact = {
-                    lang: match[1] || 'text',
-                    code: match[2]
-                };
-            }
-
-            // If found, show panel
-            if (artifact) {
-                // In a real Claude implementation, the code block is replaced by a UI card in chat
-                // For this prototype, we'll keep it in chat AND show it in side panel
-                // cleanText = text.replace(codeBlockRegex, '[Artifact Open in Panel]');
-            }
-
-            return { cleanText, artifact };
-        }
-
-        function updateArtifactPanel(artifact) {
-            artifactPanel.style.display = 'flex';
-            const highlighted = hljs.highlight(artifact.code, { language: artifact.lang || 'text' }).value;
-            
-            artifactContent.innerHTML = `
-                <div class="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-zinc-800 sticky top-0">
-                    <span class="text-xs text-zinc-400 font-mono">${artifact.lang}</span>
-                    <button class="text-xs text-zinc-400 hover:text-white" onclick="navigator.clipboard.writeText(this.dataset.code)" data-code="${encodeURIComponent(artifact.code)}">Copy</button>
-                </div>
-                <pre class="p-4 text-sm font-mono overflow-auto"><code class="hljs language-${artifact.lang}">${highlighted}</code></pre>
+        function loadHistory() {
+            // Mock history
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = `
+                <button class="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:bg-zinc-800 rounded">New Project</button>
+                <button class="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:bg-zinc-800 rounded">Previous Chat</button>
             `;
         }
     </script>
