@@ -325,7 +325,7 @@
 
         // --- UTILITY FUNCTIONS ---
         /**
-         * Validate that a value is a valid UUID or valid project ID
+         * Validate that a value is a valid UUID format
          * @param {string} value - The value to validate
          * @returns {boolean} - True if valid, false otherwise
          */
@@ -333,7 +333,7 @@
             if (!value || value === 'undefined' || value === 'null' || typeof value !== 'string') {
                 return false;
             }
-            // UUID v4 pattern (with some flexibility)
+            // UUID pattern (accepts any version: v1-v5)
             const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
             return uuidPattern.test(value);
         }
