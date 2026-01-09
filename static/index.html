@@ -333,7 +333,7 @@
             if (!value || value === 'undefined' || value === 'null' || typeof value !== 'string') {
                 return false;
             }
-            // UUID pattern (accepts any version: v1-v5)
+            // Validates standard UUID format structure (8-4-4-4-12 hexadecimal pattern)
             const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
             return uuidPattern.test(value);
         }
@@ -369,7 +369,7 @@
                     if (isValidProjectId(data.id)) {
                         await fetch('/api/projects/' + data.id + '/activate', {method: 'POST'});
                     } else {
-                        console.error('Cannot activate project: Invalid project ID', data.id, '- Please refresh the page or contact support');
+                        console.error(`Cannot activate project: Invalid project ID '${data.id}' - Please refresh the page or contact support`);
                     }
                 } else {
                     state.activeProject = data; // Ensure correct structure
@@ -393,7 +393,7 @@
         async function loadProjectFiles(projectId) {
             // Validate project ID before making API call
             if (!isValidProjectId(projectId)) {
-                console.error('Cannot load project files: Invalid project ID', projectId, '- Project list may not display correctly');
+                console.error(`Cannot load project files: Invalid project ID '${projectId}' - Project list may not display correctly`);
                 return;
             }
             
