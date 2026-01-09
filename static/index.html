@@ -5,16 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ENVY | Polymorphic Intelligence</title>
     
-    <!-- PWA -->
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#18181b">
+    <meta name="theme-color" content="#09090b">
     
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
-    <!-- Libs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
@@ -22,226 +19,464 @@
 
     <style>
         :root {
-            --bg-primary: #18181b;
-            --bg-secondary: #27272a;
-            --accent: #d97757;
+            --bg-primary: #09090b; /* Zinc 950 */
+            --bg-secondary: #18181b; /* Zinc 900 */
+            --bg-tertiary: #27272a; /* Zinc 800 */
+            --accent: #f97316; /* Orange 500 */
+            --accent-dim: rgba(249, 115, 22, 0.1);
             --text-primary: #f4f4f5;
-            --font-ui: 'Inter', sans-serif;
-            --font-body: 'Merriweather', serif;
-            --font-code: 'JetBrains Mono', monospace;
+            --text-secondary: #a1a1aa;
+            --border: #27272a;
         }
 
+        * { box-sizing: border-box; }
+        
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            font-family: var(--font-ui);
+            font-family: 'Inter', sans-serif;
             overflow: hidden;
         }
 
+        /* Typography */
         .prose p {
-            font-family: var(--font-body);
+            font-family: 'Merriweather', serif;
             font-weight: 300;
             line-height: 1.75;
             font-size: 1.05rem;
             color: #e4e4e7;
+            margin-bottom: 1em;
         }
         
+        .prose code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #fb923c;
+        }
+        
+        .prose pre {
+            background: #121212;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin-bottom: 1em;
+        }
+        
+        .prose h1, .prose h2, .prose h3 {
+            color: white;
+            font-weight: 600;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+
+        /* Layout Animations */
         #artifact-panel {
-            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s ease;
         }
         
-        .hidden { display: none !important; }
-        
-        /* Artifact Stream Animation */
-        .streaming-artifact {
-            border-left: 2px solid var(--accent);
+        /* Thought/Action Logs */
+        .thought-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            border-left: 2px solid var(--border);
             padding-left: 1rem;
-            margin: 1rem 0;
-            background: rgba(217, 119, 87, 0.05);
+            margin: 0.5rem 0;
+        }
+        
+        .action-log {
+            background: #0f172a; /* Slate 900 */
+            border: 1px solid #1e293b;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-log.success { border-color: #059669; background: rgba(5, 150, 105, 0.1); color: #34d399; }
+        .action-log.error { border-color: #dc2626; background: rgba(220, 38, 38, 0.1); color: #f87171; }
+
+        /* UI Elements */
+        .btn-ghost { @apply hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors rounded-md px-3 py-1.5 text-sm; }
+        .btn-primary { @apply bg-orange-600 hover:bg-orange-500 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors shadow-lg shadow-orange-900/20; }
+        
+        .agent-pill {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .agent-pill.active {
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+        .typing-dot {
+            width: 4px; height: 4px; background: var(--text-secondary); border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
         }
     </style>
 </head>
-<body class="flex h-screen w-full">
+<body class="flex h-screen w-full bg-zinc-950 text-zinc-100">
 
-    <!-- SIDEBAR -->
-    <aside class="hidden md:flex w-64 flex-col bg-zinc-900 border-r border-zinc-800 shrink-0">
-        <div class="p-4 border-b border-zinc-800 flex items-center justify-between">
-            <h1 class="font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
-                <div class="w-6 h-6 rounded bg-gradient-to-br from-orange-400 to-red-600"></div>
-                ENVY
-            </h1>
+    <!-- LEFT SIDEBAR: KNOWLEDGE SPINE -->
+    <aside class="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
+        <!-- Project Header -->
+        <div class="p-4 border-b border-zinc-800">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Active Project</span>
+                <button onclick="createNewProject()" class="text-xs text-orange-500 hover:text-orange-400">+ New</button>
+            </div>
+            <div id="project-selector" class="relative group">
+                <button class="w-full text-left font-medium truncate flex items-center justify-between hover:text-white transition">
+                    <span id="current-project-name">My First Project</span>
+                    <span class="text-zinc-600 text-[10px] group-hover:text-zinc-400">▼</span>
+                </button>
+            </div>
         </div>
-        <div class="flex-1 overflow-y-auto p-2 space-y-1" id="history-list">
-            <div class="text-xs font-semibold text-zinc-500 px-2 py-2">Sessions</div>
-            <button class="w-full text-left px-3 py-2 text-sm text-zinc-200 bg-zinc-800 rounded truncate">Current Chat</button>
+
+        <!-- Project Files -->
+        <div class="flex-1 overflow-y-auto p-2">
+            <div class="px-2 py-2 text-xs font-semibold text-zinc-500 flex justify-between items-center group">
+                <span>PROJECT CONTEXT</span>
+                <button onclick="document.getElementById('project-upload').click()" class="hidden group-hover:block hover:text-white" title="Add file to context">+</button>
+            </div>
+            <input type="file" id="project-upload" multiple class="hidden" onchange="uploadProjectFile(event)">
+            
+            <div id="project-file-list" class="space-y-0.5 mt-1">
+                <!-- File items injected here -->
+                <div class="px-2 py-1.5 text-sm text-zinc-500 italic">No files in context</div>
+            </div>
         </div>
-        <div class="p-4 border-t border-zinc-800">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-xs font-bold">N</div>
-                <div class="text-sm">
-                    <div class="font-medium">Nathan</div>
-                    <div class="text-xs text-zinc-500">Founder Mode</div>
-                </div>
+
+        <!-- System Stats / Connectors -->
+        <div class="p-3 border-t border-zinc-800 bg-zinc-900/50">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-semibold text-zinc-500 uppercase">System Status</span>
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[10px] text-zinc-500">
+                <div class="flex items-center gap-1"><span class="text-zinc-300">MCP:</span> <span id="mcp-status">Online</span></div>
+                <div class="flex items-center gap-1"><span class="text-zinc-300">Git:</span> <span id="git-status">Ready</span></div>
             </div>
         </div>
     </aside>
 
-    <!-- MAIN CHAT AREA -->
+    <!-- CENTER: CHAT AREA -->
     <main class="flex-1 flex flex-col relative min-w-0 bg-zinc-950">
         
-        <div id="chat-scroller" class="flex-1 overflow-y-auto px-4 md:px-0">
-            <div class="max-w-3xl mx-auto py-8 md:py-12 space-y-8" id="chat-content">
-                <!-- Welcome -->
-                <div id="empty-state" class="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
-                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl mb-4"></div>
-                    <h2 class="text-3xl font-serif font-light text-zinc-100 italic">"What shall we architect today?"</h2>
+        <!-- Header: Agent Mode -->
+        <header class="h-14 border-b border-zinc-800 flex items-center justify-between px-6 bg-zinc-950/80 backdrop-blur z-10 sticky top-0">
+            <div class="flex items-center gap-3">
+                <div class="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800" id="agent-selector">
+                    <button onclick="setMode('omni_link')" class="agent-pill active px-3 py-1 rounded-md text-xs font-medium" data-mode="omni_link">OmniLink</button>
+                    <button onclick="setMode('architect')" class="agent-pill px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200" data-mode="architect">Architect</button>
+                    <button onclick="setMode('builder')" class="agent-pill px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200" data-mode="builder">Builder</button>
+                    <button onclick="setMode('researcher')" class="agent-pill px-3 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200" data-mode="researcher">Deep Research</button>
                 </div>
+                
+                <div class="h-6 w-[1px] bg-zinc-800 mx-1"></div>
+                
+                <a href="http://srv1207230.hstgr.cloud:5678" target="_blank" class="flex items-center gap-2 bg-[#ff6d5b]/10 hover:bg-[#ff6d5b]/20 text-[#ff6d5b] px-3 py-1.5 rounded-md text-xs font-bold border border-[#ff6d5b]/30 transition-all">
+                    <span class="text-sm">⚡</span> n8n VPS
+                </a>
             </div>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleArtifactPanel()" class="btn-ghost" title="Toggle Artifacts">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Scroll Area -->
+        <div id="chat-scroller" class="flex-1 overflow-y-auto px-4 md:px-0 scroll-smooth">
+            <div class="max-w-3xl mx-auto py-8 space-y-6" id="chat-content">
+                
+                <!-- Empty State -->
+                <div id="empty-state" class="flex flex-col items-center justify-center min-h-[40vh] mt-20 text-center space-y-6 animate-in fade-in duration-700">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 shadow-2xl shadow-orange-900/40 mb-2 flex items-center justify-center text-3xl">
+                        ⚡
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-serif text-white mb-2">Polymorphic Intelligence</h2>
+                        <p class="text-zinc-500 text-sm max-w-md mx-auto">
+                            Architect systems, build apps, and research deeply.<br>
+                            I have read access to your project files and full system control.
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 w-full max-w-md">
+                        <button onclick="setPrompt('Analyze the project structure and suggest improvements', 'architect')" class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-orange-500/50 hover:bg-zinc-800 transition text-left text-sm group">
+                            <div class="font-medium text-zinc-300 group-hover:text-orange-400">🏗️ Architect Mode</div>
+                            <div class="text-xs text-zinc-500 mt-1">Review code & design systems</div>
+                        </button>
+                        <button onclick="setPrompt('Create a React component for a dashboard', 'builder')" class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-green-500/50 hover:bg-zinc-800 transition text-left text-sm group">
+                            <div class="font-medium text-zinc-300 group-hover:text-green-400">🛠️ Builder Mode</div>
+                            <div class="text-xs text-zinc-500 mt-1">Write code & scaffold apps</div>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+            <!-- Spacer for bottom input -->
+            <div class="h-32"></div>
         </div>
 
         <!-- Input Area -->
-        <div class="p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
-            <div class="max-w-3xl mx-auto bg-zinc-800/80 backdrop-blur border border-zinc-700 rounded-2xl overflow-hidden shadow-2xl transition-all focus-within:ring-2 focus-within:ring-orange-500/30">
+        <div class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pointer-events-none">
+            <div class="max-w-3xl mx-auto bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden pointer-events-auto ring-1 ring-white/5 focus-within:ring-orange-500/50 transition-all">
+                
+                <!-- File Preview -->
+                <div id="file-preview-area" class="hidden px-3 pt-3 flex gap-2 overflow-x-auto">
+                    <!-- Chips go here -->
+                </div>
+
                 <textarea 
                     id="user-input"
                     rows="1"
-                    class="w-full bg-transparent text-zinc-100 p-4 resize-none focus:outline-none font-sans text-base"
-                    placeholder="Ask ENVY..."
-                    style="min-height: 56px; max-height: 200px;"
+                    class="w-full bg-transparent text-zinc-100 p-4 resize-none focus:outline-none font-sans text-base max-h-48"
+                    placeholder="Ask ENVY anything..."
                 ></textarea>
-                <div class="flex justify-between items-center px-2 pb-2">
+                
+                <div class="flex justify-between items-center px-3 pb-3">
                     <div class="flex gap-1">
-                        <button id="upload-btn" class="p-2 text-zinc-400 hover:text-zinc-200 rounded-lg" title="Upload Files">
-                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        <button onclick="document.getElementById('chat-file-upload').click()" class="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition" title="Attach file">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                        </button>
+                        <input type="file" id="chat-file-upload" multiple class="hidden" onchange="handleChatFileUpload(event)">
+                        
+                        <div class="h-8 w-[1px] bg-zinc-800 mx-1"></div>
+                        
+                        <button onclick="triggerAction('100x')" class="p-2 text-purple-400 hover:text-purple-300 hover:bg-purple-400/10 rounded-lg transition text-xs font-bold flex items-center gap-1" title="Execute Blueprint Pipeline">
+                            <span>🚀</span> 100x
                         </button>
                     </div>
-                    <button 
-                        id="send-btn"
-                        class="bg-zinc-100 text-zinc-900 p-1.5 rounded-xl hover:bg-white transition-all disabled:opacity-50"
-                        disabled
-                    >
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </button>
+                    
+                    <div class="flex items-center gap-3">
+                        <span id="token-counter" class="text-[10px] text-zinc-600 font-mono hidden md:block">0 tokens</span>
+                        <button 
+                            id="send-btn"
+                            onclick="submitMessage()"
+                            class="bg-orange-600 hover:bg-orange-500 text-white p-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </div>
                 </div>
+            </div>
+            <div class="max-w-3xl mx-auto text-center mt-2">
+                <p class="text-[10px] text-zinc-600">ENVY v6.0 • Fully Autonomous • Local & Private</p>
             </div>
         </div>
     </main>
 
-    <!-- ARTIFACT PANEL -->
-    <aside id="artifact-panel" class="hidden w-[50%] bg-[#0d1117] border-l border-zinc-800 flex flex-col transform translate-x-full md:translate-x-0 transition-transform duration-500">
+    <!-- RIGHT SIDEBAR: ARTIFACTS -->
+    <aside id="artifact-panel" class="hidden w-[45%] bg-[#0d1117] border-l border-zinc-800 flex-col shadow-2xl z-20">
         <div class="h-12 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900">
             <div class="flex gap-4">
-                <button id="tab-preview" class="text-xs font-semibold text-zinc-100 border-b-2 border-orange-500 pb-1">Preview</button>
-                <button id="tab-code" class="text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-1">Code</button>
+                <button onclick="setArtifactView('preview')" id="tab-preview" class="text-xs font-semibold text-white border-b-2 border-orange-500 pb-3 mt-3">Preview</button>
+                <button onclick="setArtifactView('code')" id="tab-code" class="text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-3 mt-3 transition">Code</button>
             </div>
-            <button onclick="document.getElementById('artifact-panel').classList.add('hidden')" class="text-zinc-400 hover:text-white">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <button onclick="toggleArtifactPanel()" class="text-zinc-500 hover:text-white">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
-        <div id="artifact-content" class="flex-1 overflow-hidden">
-            <!-- Content Injected Here -->
+        <div class="flex-1 relative bg-white">
+            <div id="preview-container" class="absolute inset-0">
+                <iframe id="artifact-frame" class="w-full h-full border-none"></iframe>
+            </div>
+            <div id="code-container" class="absolute inset-0 bg-[#1e1e1e] hidden overflow-auto p-4">
+                <pre><code id="artifact-code-block" class="language-javascript"></code></pre>
+            </div>
         </div>
     </aside>
 
     <script>
-        // CONFIG
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    return hljs.highlight(code, { language: lang }).value;
-                }
-                return hljs.highlightAuto(code).value;
-            },
-            breaks: true
-        });
+        // --- STATE ---
+        const state = {
+            currentMode: 'omni_link',
+            activeProject: null,
+            chatFiles: [],
+            isGenerating: false,
+            artifacts: {},
+            currentArtifactId: null
+        };
 
-        const chatContent = document.getElementById('chat-content');
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const artifactPanel = document.getElementById('artifact-panel');
-        const artifactContent = document.getElementById('artifact-content');
-        
-        let currentArtifactCode = "";
-        let currentArtifactLang = "";
-        let isGenerating = false;
+        // --- DOM ELEMENTS ---
+        const els = {
+            input: document.getElementById('user-input'),
+            chatContent: document.getElementById('chat-content'),
+            sendBtn: document.getElementById('send-btn'),
+            projectList: document.getElementById('project-file-list'),
+            previewArea: document.getElementById('file-preview-area'),
+            artifactPanel: document.getElementById('artifact-panel'),
+            artifactFrame: document.getElementById('artifact-frame')
+        };
 
-        // --- ARTIFACT RENDERING ---
-        function renderArtifact(code, lang) {
-            currentArtifactCode = code;
-            currentArtifactLang = lang;
-            artifactPanel.classList.remove('hidden');
-            artifactPanel.style.transform = "translateX(0)";
-            
-            if (lang === 'html' || lang === 'svg' || lang === 'react') {
-                showPreview();
-            } else {
-                showCode();
-            }
-        }
-
-        function showPreview() {
-            document.getElementById('tab-preview').className = "text-xs font-semibold text-zinc-100 border-b-2 border-orange-500 pb-1";
-            document.getElementById('tab-code').className = "text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-1";
-            artifactContent.innerHTML = `<iframe id="preview-frame" class="w-full h-full bg-white border-none"></iframe>`;
-            const doc = document.getElementById('preview-frame').contentWindow.document;
-            doc.open();
-            doc.write(currentArtifactCode);
-            doc.close();
-        }
-
-        function showCode() {
-            document.getElementById('tab-code').className = "text-xs font-semibold text-zinc-100 border-b-2 border-orange-500 pb-1";
-            document.getElementById('tab-preview').className = "text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-1";
-            const highlighted = hljs.highlight(currentArtifactCode, {language: currentArtifactLang || 'text'}).value;
-            artifactContent.innerHTML = `<pre class="p-6 text-sm font-mono overflow-auto h-full text-zinc-300"><code>${highlighted}</code></pre>`;
-        }
-
-        document.getElementById('tab-preview').onclick = showPreview;
-        document.getElementById('tab-code').onclick = showCode;
-
-        // --- CHAT LOGIC ---
-        userInput.addEventListener('input', () => {
-            userInput.style.height = 'auto';
-            userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
-            sendBtn.disabled = !userInput.value.trim();
-        });
-
-        userInput.addEventListener('keydown', (e) => {
-            if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitMessage(); }
-        });
-
-        async function submitMessage() {
-            const text = userInput.value.trim();
-            if (!text || isGenerating) return;
-
-            if(document.getElementById('empty-state')) document.getElementById('empty-state').remove();
-
-            addMessage('user', text);
-            userInput.value = '';
-            userInput.style.height = 'auto';
-            
-            const aiId = 'msg-' + Date.now();
-            addMessageSkeleton(aiId);
-            isGenerating = true;
-
+        // --- INITIALIZATION ---
+        async function init() {
+            // 1. Load Active Project
             try {
+                let res = await fetch('/api/projects/active');
+                let data = await res.json();
+                
+                if (!data.active_project) {
+                    // Create default if none
+                    res = await fetch('/api/projects', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({name: 'Default Project', description: 'Auto-created'})
+                    });
+                    data = await res.json();
+                    await fetch('/api/projects/' + data.id + '/activate', {method: 'POST'});
+                } else {
+                    state.activeProject = data; // Ensure correct structure
+                }
+                
+                // Get fresh project details including ID
+                res = await fetch('/api/projects/active');
+                let activeData = await res.json();
+                if (activeData && (activeData.id || activeData.active_project)) {
+                    // Normalize: activeData might be {id: "...", ...} or {active_project: {id: "..."}}
+                    // The endpoint actually returns {id: "...", ...} if valid project found
+                    // Wait, get_active_project returns {id, name, ...} directly if found
+                    state.activeProject = activeData;
+                    document.getElementById('current-project-name').textContent = activeData.name || "Default Project";
+                    loadProjectFiles(activeData.id);
+                }
+
+            } catch (e) { console.error("Init failed", e); }
+        }
+        
+        async function loadProjectFiles(projectId) {
+            try {
+                const res = await fetch(`/api/projects/${projectId}/files`);
+                const data = await res.json();
+                renderProjectFiles(data.files);
+            } catch (e) { console.error("Load files failed", e); }
+        }
+        
+        function renderProjectFiles(files) {
+            if (!files || files.length === 0) {
+                els.projectList.innerHTML = '<div class="px-2 py-1.5 text-sm text-zinc-500 italic">No files in context</div>';
+                return;
+            }
+            els.projectList.innerHTML = files.map(f => `
+                <div class="px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded cursor-pointer flex items-center gap-2 truncate" title="${f.path}">
+                    <span class="opacity-50">📄</span> ${f.filename}
+                </div>
+            `).join('');
+        }
+        
+        // --- CHAT LOGIC ---
+        function setMode(mode) {
+            state.currentMode = mode;
+            document.querySelectorAll('.agent-pill').forEach(el => {
+                if (el.dataset.mode === mode) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+        }
+        
+        function setPrompt(text, mode) {
+            if (mode) setMode(mode);
+            els.input.value = text;
+            els.input.focus();
+            autoResizeInput();
+            els.sendBtn.disabled = false;
+        }
+        
+        function autoResizeInput() {
+            els.input.style.height = 'auto';
+            els.input.style.height = Math.min(els.input.scrollHeight, 192) + 'px';
+        }
+        
+        els.input.addEventListener('input', () => {
+            autoResizeInput();
+            els.sendBtn.disabled = !els.input.value.trim();
+        });
+        
+        els.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitMessage();
+            }
+        });
+        
+        // --- MESSAGE SUBMISSION ---
+        async function submitMessage() {
+            const text = els.input.value.trim();
+            if (!text || state.isGenerating) return;
+            
+            // UI Cleanup
+            document.getElementById('empty-state')?.remove();
+            els.input.value = '';
+            els.input.style.height = 'auto';
+            els.sendBtn.disabled = true;
+            
+            // Add User Message
+            appendMessage('user', text);
+            
+            // Prepare Request
+            const fileIds = state.chatFiles.map(f => f.id);
+            state.chatFiles = []; // Clear attachments
+            renderChatFiles();
+            
+            state.isGenerating = true;
+            const msgId = 'msg-' + Date.now();
+            appendSkeleton(msgId);
+            
+            try {
+                // If 100x mode trigger? No, standard chat stream but with "Blueprint" awareness
+                // For now, we use standard stream, but specific keywords might trigger endpoints.
+                // Or if user clicked "100x", we call a different endpoint.
+                
+                // Let's stick to standard stream for chat, but use the 'mode' in system prompt logic via backend (not explicit yet but persona routing handles it)
+                // Actually, I can prepend the mode instruction to the message invisibly
+                
+                let effectiveMessage = text;
+                if (state.currentMode !== 'omni_link') {
+                    effectiveMessage = `[SYSTEM: ACTIVATE PERSONA ${state.currentMode.toUpperCase()}]\n${text}`;
+                }
+                
                 const response = await fetch('/v1/chat/completions/stream', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         model: 'envy',
-                        messages: [{ role: 'user', content: text }],
-                        stream: true
+                        messages: [{role: 'user', content: effectiveMessage}],
+                        stream: true,
+                        attachments: fileIds
                     })
                 });
-
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let fullText = "";
-                const aiDiv = document.getElementById(aiId).querySelector('.prose');
-
+                
+                // Stream Loop
                 while (true) {
-                    const { done, value } = await reader.read();
+                    const {done, value} = await reader.read();
                     if (done) break;
                     
                     const chunk = decoder.decode(value);
@@ -251,63 +486,295 @@
                         if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
                             if (dataStr === '[DONE]') break;
-                            
                             try {
                                 const data = JSON.parse(dataStr);
-                                if (data.choices && data.choices[0].delta.content) {
-                                    fullText += data.choices[0].delta.content;
+                                const content = data.choices[0]?.delta?.content;
+                                if (content) {
+                                    fullText += content;
+                                    updateMessage(msgId, fullText);
                                     
-                                    // CLAUDE ARTIFACT DETECTION
-                                    if(fullText.includes('<antArtifact')) {
-                                        const match = fullText.match(/<antArtifact.*?type=\"([^\"]+)\"\s+title=\"([^\"]+)\"[^>]*>([\s\S]*?)(?:<\/antArtifact>|$)/);
-                                        if (match) {
-                                            const type = match[1];
-                                            const title = match[2];
-                                            const code = match[3];
-                                            let lang = type.split('/').pop();
-                                            renderArtifact(code, lang);
-                                            
-                                            const displayChat = fullText.replace(/<antArtifact[\s\S]*?(?:<\/antArtifact>|$)/, `\n\n> **Architected Asset:** ${title}\n`);
-                                            aiDiv.innerHTML = marked.parse(displayChat);
-                                        }
-                                    } else {
-                                        aiDiv.innerHTML = marked.parse(fullText);
-                                    }
-                                    document.getElementById('chat-scroller').scrollTop = 99999;
+                                    // ARTIFACT DETECTION
+                                    checkForArtifacts(fullText);
                                 }
                             } catch (e) {}
                         }
                     }
                 }
-            } catch (err) {
-                console.error(err);
+            } catch (e) {
+                console.error(e);
+                updateMessage(msgId, "**Error:** " + e.message);
             } finally {
-                isGenerating = false;
+                state.isGenerating = false;
+                // Final render to ensure markdown parsing
+                updateMessage(msgId, null, true); // true = finalize
+            }
+        }
+        
+        // --- RENDERING ---
+        function appendMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = `flex gap-4 ${role === 'user' ? 'justify-end' : ''} animate-in fade-in slide-in-from-bottom-2 duration-300`;
+            
+            const avatar = role === 'user' 
+                ? `<div class="w-8 h-8 rounded bg-zinc-700 flex items-center justify-center text-xs font-bold text-white shrink-0">U</div>`
+                : `<div class="w-8 h-8 rounded bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-xs font-bold text-white shrink-0">E</div>`;
+            
+            const content = role === 'user'
+                ? `<div class="bg-zinc-800 text-zinc-100 px-4 py-2.5 rounded-2xl max-w-[85%] text-sm leading-relaxed">${escapeHtml(text)}</div>`
+                : `<div class="prose prose-invert prose-sm max-w-none flex-1 min-w-0">${marked.parse(text)}</div>`;
+                
+            div.innerHTML = role === 'user' ? content + avatar : avatar + content;
+            els.chatContent.appendChild(div);
+            scrollToBottom();
+        }
+        
+        function appendSkeleton(id) {
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = `flex gap-4 animate-in fade-in duration-300`;
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-xs font-bold text-white shrink-0">E</div>
+                <div class="flex-1 min-w-0 pt-1">
+                    <div class="flex gap-1">
+                        <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            els.chatContent.appendChild(div);
+            scrollToBottom();
+        }
+        
+        function updateMessage(id, rawText, finalize = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            
+            // Clean artifacts from view
+            const cleanText = rawText ? rawText.replace(/<antArtifact[\s\S]*?<\/antArtifact>/g, '') : '';
+            
+            const contentContainer = el.querySelector('.flex-1');
+            contentContainer.innerHTML = `<div class="prose prose-invert prose-sm max-w-none">${marked.parse(cleanText)}</div>`;
+            
+            if (finalize) {
+                // Highlight code blocks
+                contentContainer.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+            scrollToBottom();
+        }
+        
+        // --- ARTIFACTS ---
+        function checkForArtifacts(text) {
+            const regex = /<antArtifact\s+identifier="([^"]+)"\s+type="([^"]+)"\s+title="([^"]+)"[^>]*>([\s\S]*?)<\/antArtifact>/g;
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                const [full, id, type, title, content] = match;
+                
+                // If new or updated artifact
+                if (!state.artifacts[id] || state.artifacts[id].content !== content) {
+                    state.artifacts[id] = { id, type, title, content: content.trim() };
+                    
+                    // AUTO OPEN
+                    if (!document.getElementById('artifact-panel').classList.contains('flex')) {
+                        toggleArtifactPanel();
+                    }
+                    renderArtifact(id);
+                }
+            }
+        }
+        
+        function renderArtifact(id) {
+            const art = state.artifacts[id];
+            state.currentArtifactId = id;
+            
+            // Setup Code View
+            document.getElementById('artifact-code-block').textContent = art.content;
+            hljs.highlightElement(document.getElementById('artifact-code-block'));
+            
+            // Setup Preview
+            const frame = document.getElementById('artifact-frame');
+            let html = "";
+            
+            if (art.type.includes('react')) {
+                html = `
+                    <!DOCTYPE html>
+                    <html><head>
+                    <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
+                    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
+                    <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                    </head><body class="bg-white p-4">
+                    <div id="root"></div>
+                    <script type="text/babel">
+                        ${art.content}
+                        const root = ReactDOM.createRoot(document.getElementById('root'));
+                        try { root.render(<App />); } catch(e) { document.body.innerHTML = '<pre style="color:red">'+e.message+'</pre>'; }
+                    <\/script>
+                    </body></html>`;
+            } else if (art.type.includes('html')) {
+                html = art.content;
+            } else {
+                html = `<pre style="padding:1rem">${art.content}</pre>`;
+            }
+            
+            frame.srcdoc = html;
+        }
+        
+        function toggleArtifactPanel() {
+            const panel = els.artifactPanel;
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+            }
+        }
+        
+        function setArtifactView(view) {
+            const prev = document.getElementById('preview-container');
+            const code = document.getElementById('code-container');
+            const tabP = document.getElementById('tab-preview');
+            const tabC = document.getElementById('tab-code');
+            
+            if (view === 'preview') {
+                prev.classList.remove('hidden');
+                code.classList.add('hidden');
+                tabP.classList.replace('text-zinc-500', 'text-white');
+                tabP.classList.add('border-b-2', 'border-orange-500');
+                tabC.classList.replace('text-white', 'text-zinc-500');
+                tabC.classList.remove('border-b-2', 'border-orange-500');
+            } else {
+                prev.classList.add('hidden');
+                code.classList.remove('hidden');
+                tabC.classList.replace('text-zinc-500', 'text-white');
+                tabC.classList.add('border-b-2', 'border-orange-500');
+                tabP.classList.replace('text-white', 'text-zinc-500');
+                tabP.classList.remove('border-b-2', 'border-orange-500');
             }
         }
 
-        function addMessage(role, text) {
+        // --- UTILS ---
+        function scrollToBottom() {
+            const scroller = document.getElementById('chat-scroller');
+            scroller.scrollTop = scroller.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
             const div = document.createElement('div');
-            div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''}`;
-            div.innerHTML = `
-                <div class="w-8 h-8 rounded-lg ${role === 'user' ? 'bg-zinc-700' : 'bg-orange-600'} flex items-center justify-center shrink-0 text-white text-xs font-bold">${role === 'user' ? 'U' : 'E'}</div>
-                <div class="max-w-[85%] ${role === 'user' ? 'bg-zinc-800 text-white rounded-2xl px-4 py-2.5' : 'prose prose-invert'}">
-                    ${role === 'user' ? text : marked.parse(text)}
-                </div>
-            `;
-            chatContent.appendChild(div);
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // --- FILE HANDLING ---
+        async function handleChatFileUpload(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+            
+            const formData = new FormData();
+            for (let i=0; i<files.length; i++) formData.append('files', files[i]);
+            
+            try {
+                const res = await fetch('/api/files/upload', {method:'POST', body: formData});
+                const data = await res.json();
+                state.chatFiles.push(...data.uploaded);
+                renderChatFiles();
+            } catch(e) { alert("Upload failed"); }
+            e.target.value = '';
+        }
+        
+        async function uploadProjectFile(e) {
+            if (!state.activeProject) return alert("No active project");
+            const files = e.target.files;
+            
+            for (let i=0; i<files.length; i++) {
+                const file = files[i];
+                const text = await file.text(); // Assuming text for now
+                
+                await fetch(`/api/projects/${state.activeProject.id}/files`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        path: file.name,
+                        content: text,
+                        mime_type: file.type || 'text/plain'
+                    })
+                });
+            }
+            loadProjectFiles(state.activeProject.id);
+            e.target.value = '';
         }
 
-        function addMessageSkeleton(id) {
-            const div = document.createElement('div');
-            div.className = `flex gap-4`;
-            div.id = id;
-            div.innerHTML = `
-                <div class="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center shrink-0 text-white text-xs font-bold">E</div>
-                <div class="prose prose-invert min-w-0 flex-1"><div class="flex gap-1 h-8 items-center"><div class="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce"></div><div class="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce" style="animation-delay: 0.1s"></div><div class="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div></div></div>
-            `;
-            chatContent.appendChild(div);
+        function renderChatFiles() {
+            if (!state.chatFiles.length) {
+                els.previewArea.classList.add('hidden');
+                return;
+            }
+            els.previewArea.classList.remove('hidden');
+            els.previewArea.innerHTML = state.chatFiles.map(f => `
+                <div class="flex items-center gap-2 bg-zinc-800 rounded px-2 py-1 text-xs border border-zinc-700">
+                    <span class="text-zinc-400">📎</span> ${f.filename}
+                </div>
+            `).join('');
         }
+
+        // --- 100x TRIGGER ---
+        async function triggerAction(action) {
+            if (action === '100x') {
+                const text = els.input.value.trim() || "Analyze project and improve it.";
+                
+                // Submit as a special request
+                document.getElementById('empty-state')?.remove();
+                els.input.value = '';
+                appendMessage('user', "🚀 EXECUTE BLUEPRINT: " + text);
+                appendSkeleton('blueprint-running');
+                
+                try {
+                    const res = await fetch('/api/blueprint/execute', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ messages: [{role:'user', content: text}] })
+                    });
+                    const data = await res.json();
+                    const resultEl = document.getElementById('blueprint-running');
+                    
+                    // Render results in accordion style
+                    let html = `
+                        <div class="space-y-4">
+                            <div class="border border-green-900/50 bg-green-900/10 rounded-lg p-4">
+                                <h3 class="text-green-400 font-bold mb-2">✅ Blueprint Executed</h3>
+                                <div class="space-y-2">
+                    `;
+                    
+                    for (const [agent, output] of Object.entries(data.results)) {
+                        html += `
+                            <details class="group">
+                                <summary class="cursor-pointer text-sm font-medium text-zinc-300 hover:text-white flex items-center gap-2 bg-zinc-800 p-2 rounded">
+                                    <span class="uppercase text-xs text-orange-500 font-bold w-20">${agent}</span>
+                                    <span class="group-open:rotate-90 transition-transform">▶</span>
+                                    <span>Expand Output</span>
+                                </summary>
+                                <div class="mt-2 pl-4 border-l border-zinc-700 prose prose-invert prose-sm">
+                                    ${marked.parse(output)}
+                                </div>
+                            </details>
+                        `;
+                    }
+                    html += `</div></div></div>`;
+                    
+                    resultEl.innerHTML = `
+                        <div class="w-8 h-8 rounded bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shrink-0">100x</div>
+                        <div class="flex-1 min-w-0">${html}</div>
+                    `;
+                    
+                } catch(e) {
+                    console.error(e);
+                    document.getElementById('blueprint-running').innerHTML = `<div class="text-red-500">Execution Failed: ${e.message}</div>`;
+                }
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>

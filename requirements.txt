@@ -1,4 +1,4 @@
-# ENVY Self-Improving AI System
+# ENVY Self-Improving AI System v6.0
 # Dependencies
 # ============================
 
@@ -27,14 +27,35 @@ asyncio-throttle>=1.0.2
 typing-extensions>=4.0.0
 requests>=2.31.0
 
-# Capabilities (The Architected Self)
-mcp>=0.1.0
-# open-interpreter>=0.2.0  # Disabled - requires Rust compiler for tiktoken build
+# ============================
+# NEW: File Upload & Processing
+# ============================
+python-multipart>=0.0.6
+aiofiles>=23.2.0
+PyPDF2>=3.0.0
+python-docx>=1.0.0
+
+# ============================
+# MCP (Model Context Protocol)
+# ============================
+mcp>=1.0.0
+
+# ============================
+# SSE (Server-Sent Events)
+# ============================
+sse-starlette>=1.6.0
+
+# ============================
+# RAG (Retrieval Augmented Generation)
+# ============================
+aiohttp>=3.9.0
+
+# ============================
+# Capabilities (Optional - Local Only)
+# ============================
+# open-interpreter>=0.2.0  # Disabled - requires Rust compiler
 # e2b_code_interpreter>=0.0.10  # Disabled - complex dependency chain
 # ollama>=0.1.6 # Disabled for Cloud Deployment (Local Only)
-
-# Payment
-stripe>=7.0.0
 
 # Testing
 pytest>=8.0.0

@@ -298,9 +298,157 @@ ENVY: "I hear real frustration in what you''re sharing. It sounds like you''re c
 ) ON CONFLICT (name) DO NOTHING;
 
 -- ===================================
+-- PROJECTS TABLE (Phase 1.1)
+-- Persistent project workspaces
+-- ===================================
+CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived', 'deleted')),
+    settings JSONB DEFAULT '{}',
+    context_snapshot TEXT[] DEFAULT '{}',
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index for listing projects
+CREATE INDEX IF NOT EXISTS idx_projects_status
+ON projects(status, updated_at DESC);
+
+-- ===================================
+-- PROJECT FILES TABLE (Phase 1.1)
+-- Files within projects
+-- ===================================
+CREATE TABLE IF NOT EXISTS project_files (
+    id TEXT NOT NULL,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    content TEXT,
+    content_hash TEXT,
+    mime_type TEXT DEFAULT 'text/plain',
+    size_bytes INTEGER DEFAULT 0,
+    is_embedded BOOLEAN DEFAULT FALSE,
+    embedding_id TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (project_id, path)
+);
+
+-- Index for file lookups
+CREATE INDEX IF NOT EXISTS idx_project_files_project
+ON project_files(project_id);
+
+-- Index for embedded files (for RAG queries)
+CREATE INDEX IF NOT EXISTS idx_project_files_embedded
+ON project_files(project_id) WHERE is_embedded = TRUE;
+
+-- ===================================
+-- DOCUMENT CHUNKS TABLE (Phase 1.2 - RAG)
+-- Chunked document content with embeddings
+-- ===================================
+CREATE TABLE IF NOT EXISTS document_chunks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    file_path TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    token_count INTEGER,
+    embedding vector(1536),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Vector index for chunk similarity search
+CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding
+ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- Index for project file chunks
+CREATE INDEX IF NOT EXISTS idx_document_chunks_project_file
+ON document_chunks(project_id, file_path);
+
+-- ===================================
+-- USER PROFILES TABLE (Phase 1.3)
+-- User preferences and learning
+-- ===================================
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY DEFAULT 'default',
+    preferences JSONB DEFAULT '{}',
+    known_facts TEXT[] DEFAULT '{}',
+    writing_style JSONB DEFAULT '{}',
+    interaction_patterns JSONB DEFAULT '{}',
+    active_project_id TEXT REFERENCES projects(id),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ===================================
+-- USER LEARNINGS TABLE (Phase 1.3)
+-- Cross-session learnings about user
+-- ===================================
+CREATE TABLE IF NOT EXISTS user_learnings (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT DEFAULT 'default',
+    learning TEXT NOT NULL,
+    category TEXT DEFAULT 'general',
+    confidence FLOAT DEFAULT 0.8,
+    source_conversation_id UUID,
+    embedding vector(1536),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Vector index for learning search
+CREATE INDEX IF NOT EXISTS idx_user_learnings_embedding
+ON user_learnings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- ===================================
+-- PROJECT RAG SEARCH FUNCTION
+-- Search document chunks by similarity
+-- ===================================
+CREATE OR REPLACE FUNCTION match_project_chunks(
+    query_embedding vector(1536),
+    target_project_id TEXT,
+    match_count INT DEFAULT 5,
+    match_threshold FLOAT DEFAULT 0.7
+)
+RETURNS TABLE (
+    id UUID,
+    file_path TEXT,
+    chunk_index INTEGER,
+    content TEXT,
+    similarity FLOAT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        dc.id,
+        dc.file_path,
+        dc.chunk_index,
+        dc.content,
+        1 - (dc.embedding <=> query_embedding) AS similarity
+    FROM document_chunks dc
+    WHERE dc.embedding IS NOT NULL
+    AND dc.project_id = target_project_id
+    AND 1 - (dc.embedding <=> query_embedding) > match_threshold
+    ORDER BY dc.embedding <=> query_embedding
+    LIMIT match_count;
+END;
+$$;
+
+-- ===================================
 -- DONE!
 -- ===================================
 COMMENT ON TABLE conversations IS 'All conversation history for ENVY';
 COMMENT ON TABLE reflections IS 'Reflexion loop learnings from failed/partial attempts';
 COMMENT ON TABLE skills IS 'ENVY skill library - structured capabilities';
 COMMENT ON TABLE archival_memory IS 'Long-term knowledge storage with vector search';
+COMMENT ON TABLE projects IS 'Persistent project workspaces (Phase 1.1)';
+COMMENT ON TABLE project_files IS 'Files within projects with content and metadata';
+COMMENT ON TABLE document_chunks IS 'RAG chunks with embeddings for semantic search';
+COMMENT ON TABLE user_profiles IS 'User preferences and settings';
+COMMENT ON TABLE user_learnings IS 'Cross-session learnings about user behavior';

@@ -55,9 +55,27 @@ htmlcov/
 !package.json
 !static/manifest.json
 
+# Uploads (keep .gitkeep only)
+/uploads/*
+!/uploads/.gitkeep
+
+# Projects data (local storage)
+/projects_data/*
+!/projects_data/.gitkeep
+
+# User profile data (local storage)
+/user_data/*
+!/user_data/.gitkeep
+
+# Data directory
+/data/
+
 # Logs
 *.log
 logs/
 
 # Docker
 .docker/
+
+# Plans (optional - can be tracked)
+# /plans/

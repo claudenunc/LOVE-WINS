@@ -42,9 +42,13 @@ from .tools.database import SupabaseTool
 
 # Capabilities (The Architected Self)
 from .capabilities.mcp_client import MCPClient
+from .capabilities.mcp_client_enhanced import EnhancedMCPClient, get_mcp_client
 from .capabilities.computer_control import VisionController, CodeController
 from .capabilities.audiovisual import VoiceSynthesizer, AvatarAnimator
 from .capabilities.setup_manager import SetupManager
+from .capabilities.file_handler import FileHandler, get_file_handler
+from .capabilities.connector_registry import ConnectorRegistry, get_connector_registry
+from .capabilities.agent_spawner import AgentSpawner, get_agent_spawner
 
 
 @dataclass
@@ -101,18 +105,24 @@ class ENVY:
         self.guardrails = Guardrails()
         self.resource_manager = get_resource_manager()
         
-        # Tools
+        # Tools (Legacy)
         self.file_manager = FileManager()
         self.system_ops = SystemOps()
         self.database_tool = SupabaseTool()
         
-        # Capabilities (The Architected Self)
+        # Capabilities (The Architected Self) - Enhanced v6.0
         self.mcp: Optional[MCPClient] = None
+        self.mcp_enhanced: Optional[EnhancedMCPClient] = None
         self.vision: Optional[VisionController] = None
         self.code_control: Optional[CodeController] = None
         self.voice: Optional[VoiceSynthesizer] = None
         self.avatar: Optional[AvatarAnimator] = None
         self.setup_manager = SetupManager()
+        
+        # New Capabilities (v6.0)
+        self.file_handler: Optional[FileHandler] = None
+        self.connector_registry: Optional[ConnectorRegistry] = None
+        self.agent_spawner: Optional[AgentSpawner] = None
         
         # State
         self.state = AgentState(agent_id=session_id)
@@ -147,24 +157,43 @@ class ENVY:
         # Initialize reflexion
         self.reflexion = ReflexionLoop(self.llm, self.memory)
 
-        # Initialize Capabilities (The Architected Self)
-        # 1. The Hands: MCP Client
+        # Initialize Capabilities (The Architected Self) - v6.0 Enhanced
+        
+        # 1. The Hands: MCP Client (Enhanced with SSE support)
         self.mcp = MCPClient()
+        self.mcp_enhanced = get_mcp_client()
         
-        # 2. The Body: Vision (Ollama Llama 3.2 Vision) & Code (Open Interpreter)
-        self.vision = VisionController(provider="ollama") # Local Vision-based control
-        self.code_control = CodeController(local_mode=True)  # Open Interpreter (Local/Private)
+        # 2. File Handler (New in v6.0)
+        self.file_handler = get_file_handler()
         
-        # 3. The Face & Voice: XTTS-v2 & LivePortrait
+        # 3. Connector Registry (New in v6.0)
+        self.connector_registry = get_connector_registry(self.mcp_enhanced)
+        
+        # 4. The Body: Vision (Ollama Llama 3.2 Vision) & Code (Open Interpreter)
+        self.vision = VisionController(provider="ollama")
+        self.code_control = CodeController(local_mode=True)
+        
+        # 5. The Face & Voice: XTTS-v2 & LivePortrait
         self.voice = VoiceSynthesizer()
         self.avatar = AvatarAnimator()
         
-        # Initialize Tool Manager
+        # 6. Agent Spawner (New in v6.0) - initialized after tool_manager
+        # Deferred to avoid circular dependency
+        
+        # Initialize Tool Manager (Enhanced v2.0)
         self.tool_manager = ToolManager(
-            mcp_client=self.mcp,
+            mcp_client=self.mcp_enhanced,
             vision=self.vision,
-            code=self.code_control
+            code=self.code_control,
+            file_handler=self.file_handler,
+            connector_registry=self.connector_registry
         )
+        
+        # 7. Agent Spawner (with LLM and tool_manager)
+        self.agent_spawner = get_agent_spawner(self.llm, self.tool_manager)
+        
+        # Update tool_manager with agent_spawner
+        self.tool_manager.agent_spawner = self.agent_spawner
         
         # Set default persona to the Polymorphic Companion
         self.current_persona = PERSONAS.get("omni_link")
@@ -178,6 +207,8 @@ class ENVY:
             await self.llm.close()
         if self.memory:
             await self.memory.close()
+        if self.mcp_enhanced:
+            await self.mcp_enhanced.close()
         self.initialized = False
     
     async def __aenter__(self):
@@ -424,6 +455,14 @@ class ENVY:
         Streaming response for SSE.
         Yields chunks of the response as they're generated.
         """
+        # DEBUG: Log incoming stream request
+        print(f"\n[DEBUG AGENT.STREAM] Received message ({len(message)} chars)")
+        print(f"[DEBUG AGENT.STREAM] Message preview: {message[:200]}...")
+        if "ATTACHED FILES:" in message:
+            print(f"[DEBUG AGENT.STREAM] Attachments detected in message")
+        else:
+            print(f"[DEBUG AGENT.STREAM] NO attachments in message")
+        
         if not self.initialized:
             await self.initialize()
         
@@ -436,12 +475,16 @@ class ENVY:
             {"role": "user", "content": message}
         ]
         
+        print(f"[DEBUG AGENT.STREAM] About to call LLM with {len(messages)} messages")
+        print(f"[DEBUG AGENT.STREAM] NOTE: Tool execution loop is BYPASSED in stream mode!")
+        
         # Stream from LLM
         try:
             stream_generator = await self.llm.complete(messages, stream=True)
             async for chunk in stream_generator:
                 yield chunk
         except Exception as e:
+            print(f"[DEBUG AGENT.STREAM] Error: {str(e)}")
             yield f"Error: {str(e)}"
 
 

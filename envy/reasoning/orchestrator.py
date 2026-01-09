@@ -13,6 +13,8 @@ from ..core.config import settings
 from .tree_of_thoughts import TreeOfThoughts
 from .chain_of_thought import ChainOfThought
 from .self_critique import SelfCritique
+from ..personas.agent_registry import CORE_AGENTS, get_core_agent
+from ..core.models import HandoffPacket
 
 
 class ReasoningOrchestrator:
@@ -53,6 +55,61 @@ class ReasoningOrchestrator:
         if enable_critique:
             self.critique = SelfCritique(llm_client)
         self.cot = ChainOfThought()
+
+    async def execute_blueprint_pipeline(
+        self, 
+        initial_request: str, 
+        context: dict
+    ) -> dict:
+        """
+        Executes the strict Master Blueprint pipeline:
+        Architect -> Builder -> Scribe -> Continuity
+        
+        Each step produces a HandoffPacket that feeds the next.
+        """
+        pipeline_results = {}
+        current_input = initial_request
+        
+        # 1. ARCHITECT (Design)
+        architect_persona = get_core_agent("architect")
+        architect_response = await self.generate_response(
+            current_input, 
+            architect_persona.system_prompt,
+            persona=architect_persona.name
+        )
+        pipeline_results["architect"] = architect_response
+        current_input = f"ARCHITECT OUTPUT:\n{architect_response}\n\nTASK: Build this."
+
+        # 2. BUILDER (Implement)
+        builder_persona = get_core_agent("builder")
+        builder_response = await self.generate_response(
+            current_input, 
+            builder_persona.system_prompt,
+            persona=builder_persona.name
+        )
+        pipeline_results["builder"] = builder_response
+        current_input = f"BUILDER OUTPUT:\n{builder_response}\n\nTASK: Document this."
+
+        # 3. SCRIBE (Document)
+        scribe_persona = get_core_agent("scribe")
+        scribe_response = await self.generate_response(
+            current_input, 
+            scribe_persona.system_prompt,
+            persona=scribe_persona.name
+        )
+        pipeline_results["scribe"] = scribe_response
+        current_input = f"SCRIBE OUTPUT:\n{scribe_response}\n\nTASK: Update memory and logs."
+
+        # 4. CONTINUITY (Persist)
+        continuity_persona = get_core_agent("continuity")
+        continuity_response = await self.generate_response(
+            current_input, 
+            continuity_persona.system_prompt,
+            persona=continuity_persona.name
+        )
+        pipeline_results["continuity"] = continuity_response
+        
+        return pipeline_results
     
     async def generate_response(
         self, 
