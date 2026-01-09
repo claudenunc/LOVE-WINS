@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     # ==========================================
     default_model: str = Field(default="llama-3.3-70b-versatile", env="DEFAULT_MODEL")
     max_tokens: int = 4096
+    # Resource limits
+    max_daily_cost_usd: float = Field(default=10.0, env="MAX_DAILY_COST_USD")
+    max_tokens_per_session: int = Field(default=20000, env="MAX_TOKENS_PER_SESSION")
     
     @model_validator(mode='after')
     def clean_api_keys(self):
