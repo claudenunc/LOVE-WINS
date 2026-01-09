@@ -9,15 +9,14 @@
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#18181b">
     
-    <!-- Fonts -->
+    <!-- Fonts: Claude-like pairing -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
-    <!-- Libs -->
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
@@ -25,240 +24,182 @@
         :root {
             --bg-primary: #18181b;
             --bg-secondary: #27272a;
+            --accent: #d97757;
             --text-primary: #f4f4f5;
             --font-ui: 'Inter', sans-serif;
             --font-body: 'Merriweather', serif;
+            --font-code: 'JetBrains Mono', monospace;
         }
-        body { background-color: var(--bg-primary); color: var(--text-primary); font-family: var(--font-ui); overflow: hidden; }
-        .prose p { font-family: var(--font-body); font-weight: 300; line-height: 1.75; font-size: 1.05rem; color: #e4e4e7; }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-ui);
+            overflow: hidden;
+        }
+
+        .prose p {
+            font-family: var(--font-body);
+            font-weight: 300;
+            line-height: 1.75;
+            font-size: 1.05rem;
+            color: #e4e4e7;
+        }
+        
+        #artifact-panel {
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
         .hidden { display: none !important; }
+        
+        /* Artifact Stream Animation */
+        .streaming-artifact {
+            border-left: 2px solid var(--accent);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            background: rgba(217, 119, 87, 0.05);
+        }
     </style>
 </head>
 <body class="flex h-screen w-full">
 
-    <!-- LOGIN SCREEN (Disabled) -->
-    <div id="auth-screen" class="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-4 hidden">
-        <!-- Auth content... -->
-    </div>
-
-    <!-- MAIN APP -->
-    <div id="app-screen" class="flex w-full h-full">
-        <!-- SIDEBAR -->
-        <aside class="hidden md:flex w-64 flex-col bg-zinc-900 border-r border-zinc-800 shrink-0">
-            <div class="p-4 border-b border-zinc-800 flex justify-between items-center">
-                <h1 class="font-semibold tracking-tight">ENVY</h1>
-                <button id="new-chat-btn" class="p-1 hover:bg-zinc-800 rounded"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
-            </div>
-            <div id="history-list" class="flex-1 overflow-y-auto p-2 space-y-1">
-                <!-- History Items Injected Here -->
-            </div>
-            <div class="p-4 border-t border-zinc-800 flex items-center gap-3 cursor-pointer hover:bg-zinc-800/50 transition-colors" id="user-profile">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white">ME</div>
-                <div class="text-sm truncate flex-1">
-                    <div id="user-email" class="font-medium truncate">User</div>
-                    <div class="text-xs text-zinc-500">Free Plan</div>
+    <!-- SIDEBAR -->
+    <aside class="hidden md:flex w-64 flex-col bg-zinc-900 border-r border-zinc-800 shrink-0">
+        <div class="p-4 border-b border-zinc-800 flex items-center justify-between">
+            <h1 class="font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gradient-to-br from-orange-400 to-red-600"></div>
+                ENVY
+            </h1>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2 space-y-1" id="history-list">
+            <div class="text-xs font-semibold text-zinc-500 px-2 py-2">Sessions</div>
+            <button class="w-full text-left px-3 py-2 text-sm text-zinc-200 bg-zinc-800 rounded truncate">Current Chat</button>
+        </div>
+        <div class="p-4 border-t border-zinc-800">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-xs font-bold">N</div>
+                <div class="text-sm">
+                    <div class="font-medium">Nathan</div>
+                    <div class="text-xs text-zinc-500">Founder Mode</div>
                 </div>
             </div>
-        </aside>
+        </div>
+    </aside>
 
-        <!-- CHAT AREA -->
-        <main class="flex-1 flex flex-col relative min-w-0 bg-zinc-950">
-            <div id="chat-scroller" class="flex-1 overflow-y-auto px-4 md:px-0">
-                <div class="max-w-3xl mx-auto py-8 md:py-12 space-y-8" id="chat-content">
-                    <!-- Welcome -->
-                    <div id="empty-state" class="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl mb-4"></div>
-                        <h2 class="text-2xl font-serif font-light text-zinc-100">How can I help you, Brother?</h2>
-                    </div>
-                </div>
-            </div>
-
-            <!-- INPUT -->
-            <div class="p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
-                <div class="max-w-3xl mx-auto bg-zinc-800/80 backdrop-blur border border-zinc-700 rounded-xl overflow-hidden shadow-2xl focus-within:ring-2 focus-within:ring-orange-500/30">
-                    <textarea id="user-input" rows="1" class="w-full bg-transparent text-zinc-100 p-4 resize-none focus:outline-none" placeholder="Ask ENVY..." style="min-height: 56px;"></textarea>
-                    <div class="flex justify-between px-2 pb-2">
-                        <div class="flex gap-1">
-                            <button class="p-2 text-zinc-400 hover:text-white rounded-lg"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
-                        </div>
-                        <button id="send-btn" class="bg-zinc-100 text-zinc-900 p-1.5 rounded-lg hover:bg-white disabled:opacity-50" disabled><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
-                    </div>
-                </div>
-            </div>
-        </main>
+    <!-- MAIN CHAT AREA -->
+    <main class="flex-1 flex flex-col relative min-w-0 bg-zinc-950">
         
-        <!-- ARTIFACT PANEL -->
-        <aside id="artifact-panel" class="hidden w-[450px] bg-zinc-900 border-l border-zinc-800 flex-col md:flex">
-            <div class="h-12 border-b border-zinc-800 flex items-center justify-between px-4">
-                <span class="text-xs font-semibold text-zinc-400 uppercase">Artifacts</span>
-                <button onclick="document.getElementById('artifact-panel').classList.add('hidden')" class="text-zinc-400"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <div id="chat-scroller" class="flex-1 overflow-y-auto px-4 md:px-0">
+            <div class="max-w-3xl mx-auto py-8 md:py-12 space-y-8" id="chat-content">
+                <!-- Welcome -->
+                <div id="empty-state" class="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl mb-4"></div>
+                    <h2 class="text-3xl font-serif font-light text-zinc-100 italic">"What shall we architect today?"</h2>
+                </div>
             </div>
-            <div id="artifact-content" class="flex-1 overflow-y-auto bg-[#0d1117] p-0"></div>
-        </aside>
-    </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 md:p-6 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent">
+            <div class="max-w-3xl mx-auto bg-zinc-800/80 backdrop-blur border border-zinc-700 rounded-2xl overflow-hidden shadow-2xl transition-all focus-within:ring-2 focus-within:ring-orange-500/30">
+                <textarea 
+                    id="user-input"
+                    rows="1"
+                    class="w-full bg-transparent text-zinc-100 p-4 resize-none focus:outline-none font-sans text-base"
+                    placeholder="Ask ENVY..."
+                    style="min-height: 56px; max-height: 200px;"
+                ></textarea>
+                <div class="flex justify-between items-center px-2 pb-2">
+                    <div class="flex gap-1">
+                        <button id="upload-btn" class="p-2 text-zinc-400 hover:text-zinc-200 rounded-lg" title="Upload Files">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                        </button>
+                    </div>
+                    <button 
+                        id="send-btn"
+                        class="bg-zinc-100 text-zinc-900 p-1.5 rounded-xl hover:bg-white transition-all disabled:opacity-50"
+                        disabled
+                    >
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ARTIFACT PANEL -->
+    <aside id="artifact-panel" class="hidden w-[50%] bg-[#0d1117] border-l border-zinc-800 flex flex-col transform translate-x-full md:translate-x-0 transition-transform duration-500">
+        <div class="h-12 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900">
+            <div class="flex gap-4">
+                <button id="tab-preview" class="text-xs font-semibold text-zinc-100 border-b-2 border-orange-500 pb-1">Preview</button>
+                <button id="tab-code" class="text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-1">Code</button>
+            </div>
+            <button onclick="document.getElementById('artifact-panel').classList.add('hidden')" class="text-zinc-400 hover:text-white">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div id="artifact-content" class="flex-1 overflow-hidden">
+            <!-- Content Injected Here -->
+        </div>
+    </aside>
 
     <script>
-        // --- AUTH LOGIC ---
-        let supabase = null;
-        let isSignup = false;
-
-        const loginBtn = document.getElementById('login-btn');
-        const signupToggle = document.getElementById('signup-toggle');
-        const authScreen = document.getElementById('auth-screen');
-        const appScreen = document.getElementById('app-screen');
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        const authTitle = document.querySelector('#auth-screen h2');
-
-        // 1. Initialize
-        async function initApp() {
-            try {
-                const res = await fetch('/api/config');
-                const config = await res.json();
-                if (config.supabase_url && config.supabase_anon_key) {
-                    supabase = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
-                    
-                    // Check active session
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session) {
-                        enterApp(session.user.email);
-                    }
-                } else {
-                    console.warn("Supabase not configured. Using mock auth.");
+        // CONFIG
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
                 }
-            } catch (e) {
-                console.error("Failed to load config:", e);
-            }
-        }
-        initApp();
-
-        // 2. Toggle Mode
-        signupToggle.addEventListener('click', () => {
-            isSignup = !isSignup;
-            authTitle.innerText = isSignup ? "Create Account" : "Welcome to ENVY";
-            loginBtn.innerText = isSignup ? "Sign Up" : "Sign In";
-            signupToggle.innerText = isSignup ? "Already have an account? Sign In" : "Need an account? Sign Up";
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true
         });
 
-        // 3. Auth Action
-        loginBtn.addEventListener('click', async () => {
-            const email = emailInput.value;
-            const password = passwordInput.value;
-            
-            if (!email || !password) {
-                alert("Please enter email and password");
-                return;
-            }
-
-            loginBtn.disabled = true;
-            loginBtn.innerText = "Processing...";
-
-            if (supabase) {
-                try {
-                    if (isSignup) {
-                        const { data, error } = await supabase.auth.signUp({ email, password });
-                        if (error) throw error;
-                        alert("Account created! Please sign in.");
-                        isSignup = false; // Switch back to login
-                        signupToggle.click(); // Trigger UI update
-                    } else {
-                        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                        if (error) throw error;
-                        enterApp(email);
-                    }
-                } catch (e) {
-                    alert(e.message);
-                }
-            } else {
-                // Mock fallback
-                localStorage.setItem('envy_user', email);
-                enterApp(email);
-            }
-            
-            loginBtn.disabled = false;
-            loginBtn.innerText = isSignup ? "Sign Up" : "Sign In";
-        });
-
-        function enterApp(email) {
-            authScreen.classList.add('hidden');
-            appScreen.classList.remove('hidden');
-            document.getElementById('user-email').innerText = email;
-            loadHistory();
-        }
-
-        // --- ARTIFACTS & RENDERING ---
-        function renderArtifact(code, lang) {
-            const container = document.getElementById('artifact-content');
-            
-            // If HTML/SVG, render preview
-            if (lang === 'html' || lang === 'svg') {
-                container.innerHTML = `
-                    <div class="h-full flex flex-col">
-                        <div class="bg-zinc-900 border-b border-zinc-800 p-2 flex justify-between">
-                            <span class="text-xs text-zinc-500">Preview</span>
-                            <button class="text-xs text-zinc-400 hover:text-white" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(code)}'))">Copy Code</button>
-                        </div>
-                        <iframe id="preview-frame" class="flex-1 bg-white w-full border-none"></iframe>
-                    </div>
-                `;
-                const doc = document.getElementById('preview-frame').contentWindow.document;
-                doc.open();
-                doc.write(code);
-                doc.close();
-            } else {
-                // Code View
-                container.innerHTML = `
-                    <div class="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-zinc-800 sticky top-0">
-                        <span class="text-xs text-zinc-400 font-mono">${lang}</span>
-                        <button class="text-xs text-zinc-400 hover:text-white" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(code)}'))">Copy</button>
-                    </div>
-                    <pre class="p-4 text-sm font-mono overflow-auto text-zinc-300"><code class="hljs language-${lang}">${hljs.highlight(code, {language: lang || 'text'}).value}</code></pre>
-                `;
-            }
-            document.getElementById('artifact-panel').classList.remove('hidden');
-        }
-
-        // --- FILE UPLOAD (DRAG & DROP) ---
-        let pendingAttachments = [];
-        
-        document.body.addEventListener('dragover', e => { e.preventDefault(); document.body.style.opacity = '0.5'; });
-        document.body.addEventListener('dragleave', e => { e.preventDefault(); document.body.style.opacity = '1'; });
-        document.body.addEventListener('drop', async e => {
-            e.preventDefault();
-            document.body.style.opacity = '1';
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) handleUpload(files[0]);
-        });
-
-        async function handleUpload(file) {
-            // Show preview in input area
-            const userInputArea = document.querySelector('#user-input').parentNode;
-            const preview = document.createElement('div');
-            preview.className = 'px-4 pb-2 flex gap-2';
-            preview.innerHTML = `<div class="text-xs bg-zinc-700 text-white px-2 py-1 rounded flex items-center gap-2">📎 ${file.name} <span class="animate-pulse">...</span></div>`;
-            userInputArea.insertBefore(preview, document.querySelector('.flex.justify-between'));
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                const data = await res.json();
-                
-                pendingAttachments.push(data);
-                preview.innerHTML = `<div class="text-xs bg-zinc-700 text-green-400 px-2 py-1 rounded flex items-center gap-2">✓ ${file.name}</div>`;
-            } catch (e) {
-                preview.innerHTML = `<div class="text-xs bg-red-900 text-white px-2 py-1 rounded">Error uploading</div>`;
-            }
-        }
-
-        // --- CHAT LOGIC ---
+        const chatContent = document.getElementById('chat-content');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
-        const chatContent = document.getElementById('chat-content');
-        const emptyState = document.getElementById('empty-state');
+        const artifactPanel = document.getElementById('artifact-panel');
+        const artifactContent = document.getElementById('artifact-content');
+        
+        let currentArtifactCode = "";
+        let currentArtifactLang = "";
+        let isGenerating = false;
 
+        // --- ARTIFACT RENDERING ---
+        function renderArtifact(code, lang) {
+            currentArtifactCode = code;
+            currentArtifactLang = lang;
+            artifactPanel.classList.remove('hidden');
+            artifactPanel.style.transform = "translateX(0)";
+            
+            if (lang === 'html' || lang === 'svg' || lang === 'react') {
+                showPreview();
+            } else {
+                showCode();
+            }
+        }
+
+        function showPreview() {
+            document.getElementById('tab-preview').className = "text-xs font-semibold text-zinc-100 border-b-2 border-orange-500 pb-1";
+            document.getElementById('tab-code').className = "text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-1";
+            artifactContent.innerHTML = `<iframe id="preview-frame" class="w-full h-full bg-white border-none"></iframe>`;
+            const doc = document.getElementById('preview-frame').contentWindow.document;
+            doc.open();
+            doc.write(currentArtifactCode);
+            doc.close();
+        }
+
+        function showCode() {
+            document.getElementById('tab-code').className = "text-xs font-semibold text-zinc-100 border-b-2 border-orange-500 pb-1";
+            document.getElementById('tab-preview').className = "text-xs font-semibold text-zinc-500 hover:text-zinc-300 pb-1";
+            const highlighted = hljs.highlight(currentArtifactCode, {language: currentArtifactLang || 'text'}).value;
+            artifactContent.innerHTML = `<pre class="p-6 text-sm font-mono overflow-auto h-full text-zinc-300"><code>${highlighted}</code></pre>`;
+        }
+
+        document.getElementById('tab-preview').onclick = showPreview;
+        document.getElementById('tab-code').onclick = showCode;
+
+        // --- CHAT LOGIC ---
         userInput.addEventListener('input', () => {
             userInput.style.height = 'auto';
             userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
@@ -268,45 +209,28 @@
         userInput.addEventListener('keydown', (e) => {
             if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitMessage(); }
         });
-        sendBtn.addEventListener('click', submitMessage);
 
         async function submitMessage() {
             const text = userInput.value.trim();
-            if(!text && pendingAttachments.length === 0) return;
-            
-            if(emptyState) emptyState.classList.add('hidden');
-            
-            // Clear attachments from UI
-            const previewContainer = document.querySelector('#user-input').parentNode.querySelector('.px-4.pb-2');
-            if (previewContainer) previewContainer.remove();
+            if (!text || isGenerating) return;
 
-            addMessage('user', text, pendingAttachments);
-            const attachmentsToSend = [...pendingAttachments];
-            pendingAttachments = [];
+            if(document.getElementById('empty-state')) document.getElementById('empty-state').remove();
+
+            addMessage('user', text);
             userInput.value = '';
             userInput.style.height = 'auto';
             
             const aiId = 'msg-' + Date.now();
-            addMessageSkeleton('ai', aiId);
+            addMessageSkeleton(aiId);
+            isGenerating = true;
 
             try {
-                // Get JWT if available
-                let token = '';
-                if (supabase) {
-                    const { data } = await supabase.auth.getSession();
-                    token = data.session?.access_token || '';
-                }
-
                 const response = await fetch('/v1/chat/completions/stream', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         model: 'envy',
                         messages: [{ role: 'user', content: text }],
-                        attachments: attachmentsToSend,
                         stream: true
                     })
                 });
@@ -316,80 +240,73 @@
                 let fullText = "";
                 const aiDiv = document.getElementById(aiId).querySelector('.prose');
 
-                while(true) {
+                while (true) {
                     const { done, value } = await reader.read();
-                    if(done) break;
+                    if (done) break;
+                    
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
-                    for(const line of lines) {
-                        if(line.startsWith('data: ')) {
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
                             const dataStr = line.slice(6);
-                            if(dataStr === '[DONE]') break;
+                            if (dataStr === '[DONE]') break;
+                            
                             try {
                                 const data = JSON.parse(dataStr);
-                                if(data.choices && data.choices[0].delta.content) {
+                                if (data.choices && data.choices[0].delta.content) {
                                     fullText += data.choices[0].delta.content;
                                     
-                                    // Artifact detection & Rendering
-                                    if(fullText.includes('```')) {
-                                        const match = fullText.match(/```(\w+)?\n([\s\S]*?)```/);
+                                    // CLAUDE ARTIFACT DETECTION
+                                    if(fullText.includes('<antArtifact')) {
+                                        const match = fullText.match(/<antArtifact.*?type=\"([^\"]+)\"\s+title=\"([^\"]+)\"[^>]*>([\s\S]*?)(?:<\/antArtifact>|$)/);
                                         if (match) {
-                                            renderArtifact(match[2], match[1] || 'text');
+                                            const type = match[1];
+                                            const title = match[2];
+                                            const code = match[3];
+                                            let lang = type.split('/').pop();
+                                            renderArtifact(code, lang);
+                                            
+                                            const displayChat = fullText.replace(/<antArtifact[\s\S]*?(?:<\/antArtifact>|$)/, `\n\n> **Architected Asset:** ${title}\n`);
+                                            aiDiv.innerHTML = marked.parse(displayChat);
                                         }
+                                    } else {
+                                        aiDiv.innerHTML = marked.parse(fullText);
                                     }
-                                    
-                                    aiDiv.innerHTML = marked.parse(fullText);
                                     document.getElementById('chat-scroller').scrollTop = 99999;
                                 }
-                            } catch(e) {}
+                            } catch (e) {}
                         }
                     }
                 }
-            } catch(e) {
-                console.error(e);
-                document.getElementById(aiId).innerHTML = `<div class="text-red-500">Connection Error</div>`;
+            } catch (err) {
+                console.error(err);
+            } finally {
+                isGenerating = false;
             }
         }
 
-        function addMessage(role, text, attachments = []) {
+        function addMessage(role, text) {
             const div = document.createElement('div');
             div.className = `flex gap-4 ${role === 'user' ? 'flex-row-reverse' : ''}`;
-            
-            let attachmentHtml = '';
-            if (attachments.length > 0) {
-                attachmentHtml = `<div class="mb-2 flex gap-2">${attachments.map(a => 
-                    `<img src="${a.url}" class="h-20 rounded-lg border border-zinc-700" alt="attachment">`
-                ).join('')}</div>`;
-            }
-
             div.innerHTML = `
-                <div class="w-8 h-8 rounded ${role === 'user' ? 'bg-zinc-700' : 'bg-gradient-to-br from-orange-400 to-red-600'} flex items-center justify-center shrink-0 text-white text-xs">${role === 'user' ? 'U' : 'E'}</div>
+                <div class="w-8 h-8 rounded-lg ${role === 'user' ? 'bg-zinc-700' : 'bg-orange-600'} flex items-center justify-center shrink-0 text-white text-xs font-bold">${role === 'user' ? 'U' : 'E'}</div>
                 <div class="max-w-[85%] ${role === 'user' ? 'bg-zinc-800 text-white rounded-2xl px-4 py-2.5' : 'prose prose-invert'}">
-                    ${attachmentHtml}
                     ${role === 'user' ? text : marked.parse(text)}
                 </div>
             `;
             chatContent.appendChild(div);
         }
 
-        function addMessageSkeleton(role, id) {
+        function addMessageSkeleton(id) {
             const div = document.createElement('div');
             div.className = `flex gap-4`;
             div.id = id;
             div.innerHTML = `
-                <div class="w-8 h-8 rounded bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shrink-0 text-white text-xs">E</div>
-                <div class="prose prose-invert min-w-0 flex-1"><span class="animate-pulse">Thinking...</span></div>
+                <div class="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center shrink-0 text-white text-xs font-bold">E</div>
+                <div class="prose prose-invert min-w-0 flex-1"><div class="flex gap-1 h-8 items-center"><div class="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce"></div><div class="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce" style="animation-delay: 0.1s"></div><div class="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div></div></div>
             `;
             chatContent.appendChild(div);
-        }
-
-        function loadHistory() {
-            // Mock history
-            const historyList = document.getElementById('history-list');
-            historyList.innerHTML = `
-                <button class="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:bg-zinc-800 rounded">New Project</button>
-                <button class="w-full text-left px-3 py-2 text-sm text-zinc-400 hover:bg-zinc-800 rounded">Previous Chat</button>
-            `;
         }
     </script>
 </body>

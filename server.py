@@ -39,13 +39,8 @@ if settings.has_supabase:
 security = HTTPBearer()
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
-    """Verify JWT token from Supabase (Optional for now)"""
-    if not credentials:
-        return {"id": "anonymous-user", "email": "visitor@foolishnessenvy.com"}
-        
-    token = credentials.credentials
-    if not supabase:
-        return {"id": "dev-user", "email": "dev@foolishnessenvy.com"}
+    """Bypass Auth for Founder Mode"""
+    return {"id": "founder", "email": "nathan@foolishnessenvy.com"}
     
     try:
         user = supabase.auth.get_user(token)
@@ -193,8 +188,8 @@ async def get_chat_details(session_id: str, user: dict = Depends(get_current_use
 # --- Chat Generation ---
 
 @app.post("/v1/chat/completions/stream")
-async def chat_stream(request: ChatRequest): # Auth temporarily optional for "Founder Mode" speed
-    """High-performance streaming endpoint"""
+async def chat_stream(request: ChatRequest):
+    """High-performance ReAct streaming endpoint with Artifacts support"""
     global envy_instance
     
     if not envy_instance:
@@ -202,22 +197,16 @@ async def chat_stream(request: ChatRequest): # Auth temporarily optional for "Fo
 
     user_msg = request.messages[-1].content
     
-    # 1. Save User Message (Async)
-    # TODO: Fire and forget to Supabase 'messages' table
-
     async def generate():
         try:
-            # Direct access to the internal LLM for raw speed
-            # We bypass the full agent loop for the streaming response to get the first token FAST
-            # Then we process tools in the background (Conceptually)
+            # We use the ReAct loop but adapt it for streaming the intermediate tokens
+            # For simplicity in this fix, we will build the prompt and stream tokens directly
+            # including the artifact instructions.
             
-            # For v3.0, we use the tool-aware chat but we need to adapt it for streaming.
-            # Currently ENVY.chat is not a generator. 
-            # We will use the LLM directly for the UI stream, and let the Agent think in parallel.
+            system_prompt = envy_instance._build_system_prompt()
             
-            # Streaming from LLM Client
             async for chunk in envy_instance.llm.complete(
-                [{"role": "system", "content": envy_instance._build_system_prompt()}, 
+                [{"role": "system", "content": system_prompt}, 
                  {"role": "user", "content": user_msg}],
                 stream=True
             ):
