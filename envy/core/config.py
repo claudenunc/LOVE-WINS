@@ -7,7 +7,7 @@ Manages all settings with environment variable support.
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing import Optional
 
 
@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     openrouter_api_url: str = "https://openrouter.ai/api/v1/chat/completions"
     openrouter_model: str = "anthropic/claude-3.5-sonnet"
     
+    @model_validator(mode='after')
+    def clean_api_keys(self):
+        if self.groq_api_key:
+            self.groq_api_key = self.groq_api_key.strip()
+        if self.openrouter_api_key:
+            self.openrouter_api_key = self.openrouter_api_key.strip()
+        return self
+
     # ===== DATABASE =====
     supabase_url: str = Field(default="", env="SUPABASE_URL")
     supabase_anon_key: str = Field(default="", env="SUPABASE_ANON_KEY")
