@@ -206,13 +206,20 @@
                     // Show warning in UI if configured incorrectly
                     if (!data.groq_configured && !data.openrouter_configured) {
                         const warning = document.createElement('div');
-                        warning.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-orange-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                        warning.innerHTML = '⚠️ API keys not configured. Please set GROQ_API_KEY or OPENROUTER_API_KEY';
+                        warning.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-orange-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-2xl text-center';
+                        warning.innerHTML = '⚠️ <strong>API Key Required:</strong> Set GROQ_API_KEY (free at groq.com) or OPENROUTER_API_KEY in environment variables';
                         document.body.appendChild(warning);
+                        
+                        // Add welcome message to chat
+                        addMessage('assistant', `# 🔧 Configuration Required\n\n**ENVY needs an API key to function.**\n\n### Quick Setup:\n\n1. **Get a free API key:**\n   - Go to [groq.com](https://groq.com) (free, fast)\n   - Or [openrouter.ai](https://openrouter.ai) (100+ models)\n\n2. **Set environment variable:**\n   \`\`\`bash\n   export GROQ_API_KEY="your-key-here"\n   \`\`\`\n\n3. **Restart the server:**\n   \`\`\`bash\n   python server.py\n   \`\`\`\n\n### On Render:\n1. Go to Dashboard → Your Service\n2. Environment → Add Variable\n3. Name: \`GROQ_API_KEY\`\n4. Value: Your API key\n5. Save (auto-restarts)\n\n*Chat will work once configured!*`);
                     }
+                } else {
+                    // Server ready - show welcome
+                    addMessage('assistant', `# 👋 Welcome to ENVY\n\n**Polymorphic Intelligence System** - Multi-agent AI with Claude-like capabilities.\n\n### What I Can Do:\n- 💬 Natural conversations with context memory\n- 🏗️ Create n8n workflows, websites, and apps\n- 📊 Generate artifacts (code, diagrams, documents)\n- 🤖 Multi-agent orchestration (Architect, Builder, Scribe, etc.)\n- 🧠 Autonomous reasoning with tool use\n\n**Try asking:** "Create a website for my portfolio" or "Build an n8n workflow for email automation"\n\n*Open source • No subscription • No sign-up required*`);
                 }
             } catch (err) {
                 console.error('Failed to check server status:', err);
+                addMessage('assistant', `⚠️ **Connection Error**\n\nCouldn't connect to server. Please ensure:\n- Server is running: \`python server.py\`\n- Listening on http://localhost:8000\n- Check terminal for errors`);
             }
         }
         checkServerStatus();
@@ -338,7 +345,18 @@
             } catch (err) {
                 console.error('Chat error:', err);
                 const aiDiv = document.getElementById(aiId).querySelector('.prose');
-                aiDiv.innerHTML = marked.parse(`⚠️ **Error**: ${err.message || 'Failed to connect to server. Please check if the server is running and API keys are configured.'}`);
+                let errorMsg = `⚠️ **Error**: ${err.message || 'Connection failed'}`;
+                
+                // Add troubleshooting tips
+                if (err.message && err.message.includes('Failed to fetch')) {
+                    errorMsg += `\n\n**Troubleshooting:**\n- Is the server running? (\`python server.py\`)\n- Check if API keys are configured\n- Look at terminal/console for errors`;
+                } else if (err.message && (err.message.includes('401') || err.message.includes('403'))) {
+                    errorMsg += `\n\n**API Key Issue:**\nYour API key may be invalid or expired.\n- Get a new key from groq.com or openrouter.ai\n- Set: \`export GROQ_API_KEY="your-key"\`\n- Restart server`;
+                } else if (err.message && err.message.includes('5')) {
+                    errorMsg += `\n\n**Server Error:**\nThe LLM API returned an error. Check:\n- API key is valid\n- Service is not rate-limited\n- Check server logs for details`;
+                }
+                
+                aiDiv.innerHTML = marked.parse(errorMsg);
             } finally {
                 isGenerating = false;
             }

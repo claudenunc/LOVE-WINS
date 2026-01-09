@@ -21,7 +21,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
-from supabase import create_client, Client
 
 from envy.agent import ENVY
 from envy.personas.persona_definitions import PERSONAS
@@ -36,9 +35,13 @@ from envy.orchestration.protocols import TaskEnvelope
 # Database Setup (Optional)
 # ===================================
 
-supabase: Optional[Client] = None
-if settings.has_supabase:
-    supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+supabase = None
+try:
+    from supabase import create_client, Client
+    if settings.has_supabase:
+        supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+except ImportError:
+    print("[!] Supabase not installed - database features disabled (optional)")
 
 # ===================================
 # Pydantic Models
