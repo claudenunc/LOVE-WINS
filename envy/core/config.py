@@ -33,7 +33,39 @@ class Settings(BaseSettings):
             self.groq_api_key = self.groq_api_key.strip()
         if self.openrouter_api_key:
             self.openrouter_api_key = self.openrouter_api_key.strip()
+        
+        # Validate API URLs are properly formatted
+        self._validate_url("groq_api_url", self.groq_api_url)
+        self._validate_url("openrouter_api_url", self.openrouter_api_url)
+        
         return self
+    
+    def _validate_url(self, name: str, url: str):
+        """Validate that a URL is properly formatted"""
+        if not url:
+            return
+        
+        # Check for common mistakes
+        if url.endswith('/'):
+            # Remove trailing slash
+            setattr(self, name, url.rstrip('/'))
+        
+        # Validate it starts with http:// or https://
+        if not url.startswith(('http://', 'https://')):
+            raise ValueError(
+                f"Invalid {name}: '{url}'\n"
+                f"URLs must start with 'http://' or 'https://'\n"
+                f"Check your environment variables for typos."
+            )
+        
+        # Check for obviously wrong URLs (like non-existent Render services)
+        if 'envy-api.onrender.com' in url:
+            raise ValueError(
+                f"Invalid {name}: '{url}'\n"
+                f"The URL 'envy-api.onrender.com' does not exist.\n"
+                f"If deploying on Render, your service URL will be different.\n"
+                f"Remove any environment variables with this URL and restart."
+            )
 
     # ===== DATABASE =====
     supabase_url: str = Field(default="", env="SUPABASE_URL")

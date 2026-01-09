@@ -88,6 +88,22 @@ async def lifespan(app: FastAPI):
     print("\n>>> DEPLOYMENT: NO-AUTH v5.0 (Sign-in Disabled) <<<\n")
     global envy_instance, orchestrator_instance, knowledge_spine, init_error
     
+    # Validate configuration first (catches invalid URLs)
+    try:
+        provider = settings.validate_and_print()
+        print(f"[✓] Configuration validated")
+    except ValueError as e:
+        init_error = str(e)
+        print("\n" + "=" * 60)
+        print("   ❌ CONFIGURATION ERROR")
+        print("=" * 60)
+        print(f"\n{init_error}\n")
+        print("To fix: Go to Render Dashboard → Environment → Remove invalid URLs")
+        print("=" * 60 + "\n")
+        # Don't crash the server, just disable chat
+        yield
+        return
+    
     # Check for API keys
     has_llm = settings.has_groq or settings.has_openrouter
     if not has_llm:

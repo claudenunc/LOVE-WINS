@@ -1,5 +1,37 @@
 # 🔧 ENVY Troubleshooting Guide
 
+## InvalidURL Error (https://envy-api.onrender.com/)
+
+### Symptom
+Server shows: `raise InvalidURL(error) https://envy-api.onrender.com/`
+
+### Cause
+A configuration contains an invalid or non-existent URL. This specific URL (`envy-api.onrender.com`) doesn't exist.
+
+### Solution
+
+**On Render:**
+1. Go to your service dashboard → Settings → Environment
+2. Look for any variables containing `envy-api.onrender.com`
+3. Delete those variables (they're not needed)
+4. Save changes (service will auto-restart)
+
+**Locally:**
+```bash
+# Check for env file
+cat .env | grep -i "url"
+
+# Remove any lines with envy-api.onrender.com
+# Your service URL should match your actual Render service name
+```
+
+**Common mistake:**
+- Someone may have set `ENVY_API_URL` or `API_BASE_URL` to a placeholder value
+- Remove ALL custom URL environment variables unless you know what they do
+- The system automatically uses the correct URLs based on your API keys
+
+---
+
 ## Chat Not Responding
 
 ### Symptom
