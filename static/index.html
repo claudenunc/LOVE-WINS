@@ -36,34 +36,13 @@
 </head>
 <body class="flex h-screen w-full">
 
-    <!-- LOGIN SCREEN -->
-    <div id="auth-screen" class="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-4">
-        <div class="w-full max-w-md space-y-8">
-            <div class="text-center">
-                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-orange-400 to-red-600 shadow-2xl shadow-orange-900/20 mb-6"></div>
-                <h2 class="text-3xl font-serif font-light text-zinc-100">Welcome to ENVY</h2>
-                <p class="mt-2 text-zinc-400">The Polymorphic Companion</p>
-            </div>
-            
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-8 space-y-6 shadow-xl">
-                <div class="space-y-2">
-                    <label class="text-xs font-semibold text-zinc-500 uppercase">Email</label>
-                    <input type="email" id="email" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500 transition-colors" placeholder="nathan@example.com">
-                </div>
-                <div class="space-y-2">
-                    <label class="text-xs font-semibold text-zinc-500 uppercase">Password</label>
-                    <input type="password" id="password" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500 transition-colors" placeholder="••••••••">
-                </div>
-                <button id="login-btn" class="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-semibold py-3 rounded-lg transition-all">Sign In</button>
-                <div class="text-center text-xs text-zinc-500">
-                    <button id="signup-toggle" class="hover:text-zinc-300 underline">Need an account? Sign Up</button>
-                </div>
-            </div>
-        </div>
+    <!-- LOGIN SCREEN (Disabled) -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-4 hidden">
+        <!-- Auth content... -->
     </div>
 
-    <!-- MAIN APP (Hidden until auth) -->
-    <div id="app-screen" class="flex w-full h-full hidden">
+    <!-- MAIN APP -->
+    <div id="app-screen" class="flex w-full h-full">
         <!-- SIDEBAR -->
         <aside class="hidden md:flex w-64 flex-col bg-zinc-900 border-r border-zinc-800 shrink-0">
             <div class="p-4 border-b border-zinc-800 flex justify-between items-center">

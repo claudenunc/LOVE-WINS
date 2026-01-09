@@ -38,11 +38,13 @@ if settings.has_supabase:
 
 security = HTTPBearer()
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token from Supabase"""
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """Verify JWT token from Supabase (Optional for now)"""
+    if not credentials:
+        return {"id": "anonymous-user", "email": "visitor@foolishnessenvy.com"}
+        
     token = credentials.credentials
     if not supabase:
-        # Dev mode: Mock user if DB not set up
         return {"id": "dev-user", "email": "dev@foolishnessenvy.com"}
     
     try:
