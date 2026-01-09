@@ -410,6 +410,39 @@ class ENVY:
     def enable_enhanced_reasoning(self, enabled: bool = True):
         """Enable or disable enhanced reasoning"""
         self.use_enhanced_reasoning = enabled
+    
+    async def process(self, message: str) -> str:
+        """
+        Simple processing method for server integration.
+        Returns just the response content string.
+        """
+        response = await self.chat(message)
+        return response.content
+    
+    async def stream(self, message: str):
+        """
+        Streaming response for SSE.
+        Yields chunks of the response as they're generated.
+        """
+        if not self.initialized:
+            await self.initialize()
+        
+        # Build system prompt
+        system_prompt = self._build_system_prompt()
+        
+        # Build messages
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ]
+        
+        # Stream from LLM
+        try:
+            stream_generator = await self.llm.complete(messages, stream=True)
+            async for chunk in stream_generator:
+                yield chunk
+        except Exception as e:
+            yield f"Error: {str(e)}"
 
 
 # Convenience function for simple usage

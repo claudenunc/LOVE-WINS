@@ -55,15 +55,30 @@ class ChatRequest(BaseModel):
 # ===================================
 
 envy_instance: Optional[ENVY] = None
+init_error: Optional[str] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("\n>>> DEPLOYMENT: NO-AUTH v5.0 (Sign-in Disabled) <<<\n")
-    global envy_instance
-    envy_instance = ENVY(session_id="production")
-    await envy_instance.initialize()
-    print("[*] ENVY System: ONLINE")
+    global envy_instance, init_error
+    
+    # Check for API keys
+    has_llm = settings.has_groq or settings.has_openrouter
+    if not has_llm:
+        init_error = "No LLM API key configured! Please set GROQ_API_KEY or OPENROUTER_API_KEY environment variable on Render."
+        print(f"[!] WARNING: {init_error}")
+        print("[*] Chat will be disabled until API keys are configured.")
+    else:
+        try:
+            envy_instance = ENVY(session_id="production")
+            await envy_instance.initialize()
+            print("[*] ENVY System: ONLINE")
+        except Exception as e:
+            init_error = f"Failed to initialize ENVY: {str(e)}"
+            print(f"[!] ERROR: {init_error}")
+    
     yield
+    
     if envy_instance:
         await envy_instance.close()
 
@@ -93,7 +108,23 @@ app.add_middleware(
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Render"""
-    return {"status": "healthy", "version": "5.0.0", "auth": "disabled"}
+    return {
+        "status": "healthy" if envy_instance else "degraded",
+        "version": "5.0.0",
+        "auth": "disabled",
+        "llm_configured": settings.has_groq or settings.has_openrouter,
+        "error": init_error
+    }
+
+@app.get("/api/status")
+async def api_status():
+    """Check if the AI is ready"""
+    return {
+        "ready": envy_instance is not None,
+        "error": init_error,
+        "groq_configured": settings.has_groq,
+        "openrouter_configured": settings.has_openrouter
+    }
 
 @app.get("/api/personas")
 async def get_personas():
@@ -114,12 +145,16 @@ async def get_personas():
 async def chat_completion(request: ChatRequest):
     """Non-streaming chat completion"""
     if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
+        error_msg = init_error or "ENVY not initialized. Please configure GROQ_API_KEY or OPENROUTER_API_KEY in Render environment variables."
+        raise HTTPException(status_code=503, detail=error_msg)
     
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
     user_message = messages[-1]["content"] if messages else ""
     
-    response = await envy_instance.process(user_message)
+    try:
+        response = await envy_instance.process(user_message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
     
     return {
         "id": f"chatcmpl-{int(time.time())}",
@@ -139,13 +174,28 @@ async def chat_completion(request: ChatRequest):
 @app.post("/v1/chat/completions/stream")
 async def chat_completion_stream(request: ChatRequest):
     """Streaming chat completion (SSE)"""
-    if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
-    
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
     user_message = messages[-1]["content"] if messages else ""
     
     async def generate() -> AsyncGenerator[str, None]:
+        # Check if ENVY is initialized
+        if not envy_instance:
+            error_msg = init_error or "ENVY not initialized. Please configure GROQ_API_KEY or OPENROUTER_API_KEY in Render environment variables."
+            data = {
+                "id": f"chatcmpl-{int(time.time())}",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {"content": f"⚠️ **Configuration Error**\n\n{error_msg}\n\nTo fix this:\n1. Go to Render Dashboard\n2. Navigate to your service\n3. Add environment variable: `OPENROUTER_API_KEY` or `GROQ_API_KEY`\n4. The service will restart automatically"},
+                    "finish_reason": None
+                }]
+            }
+            yield f"data: {json.dumps(data)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        
         try:
             async for chunk in envy_instance.stream(user_message):
                 data = {
@@ -162,8 +212,19 @@ async def chat_completion_stream(request: ChatRequest):
                 yield f"data: {json.dumps(data)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
-            error_data = {"error": str(e)}
+            error_data = {
+                "id": f"chatcmpl-{int(time.time())}",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {"content": f"\n\n⚠️ **Error:** {str(e)}"},
+                    "finish_reason": None
+                }]
+            }
             yield f"data: {json.dumps(error_data)}\n\n"
+            yield "data: [DONE]\n\n"
     
     return StreamingResponse(
         generate(),
