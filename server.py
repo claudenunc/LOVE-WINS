@@ -27,6 +27,11 @@ from envy.agent import ENVY
 from envy.personas.persona_definitions import PERSONAS
 from envy.core.config import settings
 
+# Import orchestration components
+from envy.orchestration.orchestrator import Orchestrator
+from envy.orchestration.knowledge_spine import KnowledgeSpine
+from envy.orchestration.protocols import TaskEnvelope
+
 # ===================================
 # Database Setup (Optional)
 # ===================================
@@ -48,6 +53,22 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     stream: bool = True
     session_id: Optional[str] = None
+
+class BlueprintRequest(BaseModel):
+    """Request to execute Architect → Builder → Scribe pipeline"""
+    blueprint_type: str = Field(..., description="n8n_workflow, website, app, automation, etc.")
+    name: str = Field(..., description="Name of the thing to build")
+    description: str = Field(..., description="What it should do")
+    requirements: Dict[str, Any] = Field(default_factory=dict, description="Additional requirements")
+    project_id: Optional[str] = Field(default="default", description="Project ID for context")
+
+class BlueprintResponse(BaseModel):
+    """Response from blueprint execution"""
+    success: bool
+    project_id: str
+    task_id: str
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
     attachments: Optional[List[Dict[str, str]]] = None
 
 # ===================================
@@ -55,12 +76,14 @@ class ChatRequest(BaseModel):
 # ===================================
 
 envy_instance: Optional[ENVY] = None
+orchestrator_instance: Optional[Orchestrator] = None
+knowledge_spine: Optional[KnowledgeSpine] = None
 init_error: Optional[str] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("\n>>> DEPLOYMENT: NO-AUTH v5.0 (Sign-in Disabled) <<<\n")
-    global envy_instance, init_error
+    global envy_instance, orchestrator_instance, knowledge_spine, init_error
     
     # Check for API keys
     has_llm = settings.has_groq or settings.has_openrouter
@@ -73,6 +96,11 @@ async def lifespan(app: FastAPI):
             envy_instance = ENVY(session_id="production")
             await envy_instance.initialize()
             print("[*] ENVY System: ONLINE")
+            
+            # Initialize multi-agent orchestration system
+            knowledge_spine = KnowledgeSpine(base_path="./memory/knowledge_spine")
+            orchestrator_instance = Orchestrator(envy_instance.llm, knowledge_spine)
+            print("[*] Multi-Agent Orchestrator: ONLINE")
         except Exception as e:
             init_error = f"Failed to initialize ENVY: {str(e)}"
             print(f"[!] ERROR: {init_error}")
@@ -235,6 +263,150 @@ async def chat_completion_stream(request: ChatRequest):
             "X-Accel-Buffering": "no"
         }
     )
+
+# ===================================
+# Blueprint Execution API
+# ===================================
+
+@app.post("/api/blueprint/execute", response_model=BlueprintResponse)
+async def execute_blueprint(request: BlueprintRequest):
+    """
+    Execute the Architect → Builder → Scribe pipeline to create something.
+    
+    This is the unified creation endpoint that orchestrates multi-agent workflows.
+    """
+    if not orchestrator_instance or not envy_instance:
+        raise HTTPException(
+            status_code=503,
+            detail="Orchestrator not initialized. Please configure API keys."
+        )
+    
+    try:
+        # Create or get project
+        project_id = request.project_id or "default"
+        
+        # Check if project exists, create if not
+        existing_project = orchestrator_instance.spine.get_project(project_id)
+        if not existing_project:
+            project_id = await orchestrator_instance.create_project(
+                name=request.name,
+                mission=request.description
+            )
+        
+        # Build instruction based on blueprint type
+        instruction = _build_blueprint_instruction(
+            request.blueprint_type,
+            request.name,
+            request.description,
+            request.requirements
+        )
+        
+        # Create task envelope for Architect
+        task = TaskEnvelope(
+            origin="human",
+            project_id=project_id,
+            instruction=instruction,
+            expected_output_type="spec",
+            downstream_agent="architect",
+            priority="high"
+        )
+        
+        # Submit to orchestrator (Architect → Builder → Scribe happens automatically)
+        task_id = await orchestrator_instance.submit_task(task)
+        
+        # Get results from Knowledge Spine
+        project_status = orchestrator_instance.get_project_status(project_id)
+        
+        return BlueprintResponse(
+            success=True,
+            project_id=project_id,
+            task_id=task_id,
+            result={
+                "status": "Pipeline executing",
+                "project": project_status,
+                "message": f"Creating {request.blueprint_type}: {request.name}"
+            }
+        )
+        
+    except Exception as e:
+        return BlueprintResponse(
+            success=False,
+            project_id=request.project_id or "unknown",
+            task_id="error",
+            error=str(e)
+        )
+
+
+def _build_blueprint_instruction(
+    blueprint_type: str,
+    name: str,
+    description: str,
+    requirements: Dict[str, Any]
+) -> str:
+    """Build instruction for the Architect based on blueprint type"""
+    
+    if blueprint_type == "n8n_workflow":
+        return f"""Design an n8n workflow: {name}
+
+Description: {description}
+
+Requirements:
+{json.dumps(requirements, indent=2)}
+
+Please create a complete n8n workflow specification including:
+1. Trigger nodes (webhook, schedule, etc.)
+2. Processing nodes (ENVY agents, transformations)
+3. Action nodes (send email, update database, etc.)
+4. Error handling
+5. Connection map between all nodes
+
+Output the workflow as JSON compatible with n8n import."""
+    
+    elif blueprint_type == "website":
+        return f"""Design a website: {name}
+
+Description: {description}
+
+Requirements:
+{json.dumps(requirements, indent=2)}
+
+Please create a complete website specification including:
+1. Page structure and routes
+2. Design style and components
+3. Technology stack (HTML/CSS/JS or React/Vue/etc.)
+4. Content for each page
+5. Navigation structure
+
+Prepare specs for the Builder to implement."""
+    
+    elif blueprint_type == "app":
+        return f"""Design an application: {name}
+
+Description: {description}
+
+Requirements:
+{json.dumps(requirements, indent=2)}
+
+Please create a complete application specification including:
+1. Architecture (frontend, backend, database)
+2. Features and user flows
+3. API endpoints if applicable
+4. Database schema if needed
+5. Tech stack recommendations
+
+Prepare detailed specs for implementation."""
+    
+    else:
+        return f"""Design and create: {name}
+
+Type: {blueprint_type}
+Description: {description}
+
+Requirements:
+{json.dumps(requirements, indent=2)}
+
+Please analyze and create appropriate specifications."""
+
 
 # ===================================
 # Static Files & Root Route
