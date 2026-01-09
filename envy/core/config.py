@@ -60,21 +60,21 @@ class Settings(BaseSettings):
             return
         
         # Normalize: remove trailing slash
-        url = url.rstrip('/')
-        setattr(self, name, url)
+        normalized_url = url.rstrip('/')
+        setattr(self, name, normalized_url)
         
         # Validate it starts with http:// or https://
-        if not url.startswith(('http://', 'https://')):
+        if not normalized_url.startswith(('http://', 'https://')):
             raise ValueError(
-                f"Invalid {name}: '{url}'\n"
+                f"Invalid {name}: '{normalized_url}'\n"
                 f"URLs must start with 'http://' or 'https://'\n"
                 f"Check your environment variables for typos."
             )
         
         # Check for obviously wrong URLs (like non-existent Render services)
-        if 'envy-api.onrender.com' in url:
+        if 'envy-api.onrender.com' in normalized_url:
             raise ValueError(
-                f"Invalid {name}: '{url}'\n"
+                f"Invalid {name}: '{normalized_url}'\n"
                 f"The URL 'envy-api.onrender.com' does not exist.\n"
                 f"This appears to be a placeholder or misconfigured URL.\n"
                 f"Fix: Remove this environment variable and use the default URL."

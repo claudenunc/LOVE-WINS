@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
     
     # Validate configuration first (catches invalid URLs)
     try:
-        provider = settings.validate_and_print()
+        settings.validate_and_print()
         print(f"[✓] Configuration validated")
     except ValueError as e:
         init_error = str(e)
