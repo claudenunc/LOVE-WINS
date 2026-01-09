@@ -214,8 +214,23 @@
                         addMessage('assistant', `# 🔧 Configuration Required\n\n**ENVY needs an API key to function.**\n\n### Quick Setup:\n\n1. **Get a free API key:**\n   - Go to [groq.com](https://groq.com) (free, fast)\n   - Or [openrouter.ai](https://openrouter.ai) (100+ models)\n\n2. **Set environment variable:**\n   \`\`\`bash\n   export GROQ_API_KEY="your-key-here"\n   \`\`\`\n\n3. **Restart the server:**\n   \`\`\`bash\n   python server.py\n   \`\`\`\n\n### On Render:\n1. Go to Dashboard → Your Service\n2. Environment → Add Variable\n3. Name: \`GROQ_API_KEY\`\n4. Value: Your API key\n5. Save (auto-restarts)\n\n*Chat will work once configured!*`);
                     }
                 } else {
-                    // Server ready - show welcome
-                    addMessage('assistant', `# 👋 Welcome to ENVY\n\n**Polymorphic Intelligence System** - Multi-agent AI with Claude-like capabilities.\n\n### What I Can Do:\n- 💬 Natural conversations with context memory\n- 🏗️ Create n8n workflows, websites, and apps\n- 📊 Generate artifacts (code, diagrams, documents)\n- 🤖 Multi-agent orchestration (Architect, Builder, Scribe, etc.)\n- 🧠 Autonomous reasoning with tool use\n\n**Try asking:** "Create a website for my portfolio" or "Build an n8n workflow for email automation"\n\n*Open source • No subscription • No sign-up required*`);
+                    // Server ready - validate the API key works
+                    try {
+                        const validateResp = await fetch('/api/validate-key');
+                        const validateData = await validateResp.json();
+                        
+                        if (!validateData.valid) {
+                            // API key is set but doesn't work
+                            addMessage('assistant', `# ⚠️ API Key Issue\n\n**The API key is configured but not working.**\n\n**Error:** ${validateData.error}\n\n**Fix:** ${validateData.fix}\n\n### Troubleshooting:\n1. Verify your API key is correct (copy/paste from provider)\n2. Check the key hasn't expired\n3. Try a different provider (Groq or OpenRouter)\n4. Check server logs for details\n\n*See TROUBLESHOOTING.md for more help*`);
+                        } else {
+                            // Everything works - show welcome
+                            addMessage('assistant', `# 👋 Welcome to ENVY\n\n**Polymorphic Intelligence System** - Multi-agent AI with Claude-like capabilities.\n\n✅ **Status:** Connected to ${validateData.provider} (${validateData.model})\n\n### What I Can Do:\n- 💬 Natural conversations with context memory\n- 🏗️ Create n8n workflows, websites, and apps\n- 📊 Generate artifacts (code, diagrams, documents)\n- 🤖 Multi-agent orchestration (Architect, Builder, Scribe, etc.)\n- 🧠 Autonomous reasoning with tool use\n\n**Try asking:** "Create a website for my portfolio" or "Build an n8n workflow for email automation"\n\n*Open source • No subscription • No sign-up required*`);
+                        }
+                    } catch (validateErr) {
+                        console.warn('Could not validate API key:', validateErr);
+                        // Still show welcome even if validation fails
+                        addMessage('assistant', `# 👋 Welcome to ENVY\n\n**Polymorphic Intelligence System** - Multi-agent AI with Claude-like capabilities.\n\n### What I Can Do:\n- 💬 Natural conversations with context memory\n- 🏗️ Create n8n workflows, websites, and apps\n- 📊 Generate artifacts (code, diagrams, documents)\n- 🤖 Multi-agent orchestration (Architect, Builder, Scribe, etc.)\n- 🧠 Autonomous reasoning with tool use\n\n**Try asking:** "Create a website for my portfolio" or "Build an n8n workflow for email automation"\n\n*Open source • No subscription • No sign-up required*`);
+                    }
                 }
             } catch (err) {
                 console.error('Failed to check server status:', err);
