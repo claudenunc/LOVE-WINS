@@ -98,7 +98,10 @@ async def lifespan(app: FastAPI):
         print("   ❌ CONFIGURATION ERROR")
         print("=" * 60)
         print(f"\n{init_error}\n")
-        print("To fix: Go to Render Dashboard → Environment → Remove invalid URLs")
+        print("To fix:")
+        print("  • Check environment variables for invalid URLs")
+        print("  • If on Render: Dashboard → Environment → Remove invalid values")
+        print("  • If local: Check .env file for misconfigured URLs")
         print("=" * 60 + "\n")
         # Don't crash the server, just disable chat
         yield

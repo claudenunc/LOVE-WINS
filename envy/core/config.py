@@ -41,14 +41,27 @@ class Settings(BaseSettings):
         return self
     
     def _validate_url(self, name: str, url: str):
-        """Validate that a URL is properly formatted"""
+        """
+        Validate and normalize API URLs.
+        
+        Validations performed:
+        - Ensures URL starts with http:// or https://
+        - Removes trailing slashes
+        - Blocks known invalid/placeholder URLs
+        
+        Args:
+            name: Configuration field name (for error messages)
+            url: The URL to validate
+            
+        Raises:
+            ValueError: If URL format is invalid or contains blocked patterns
+        """
         if not url:
             return
         
-        # Check for common mistakes
-        if url.endswith('/'):
-            # Remove trailing slash
-            setattr(self, name, url.rstrip('/'))
+        # Normalize: remove trailing slash
+        url = url.rstrip('/')
+        setattr(self, name, url)
         
         # Validate it starts with http:// or https://
         if not url.startswith(('http://', 'https://')):
@@ -63,8 +76,8 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"Invalid {name}: '{url}'\n"
                 f"The URL 'envy-api.onrender.com' does not exist.\n"
-                f"If deploying on Render, your service URL will be different.\n"
-                f"Remove any environment variables with this URL and restart."
+                f"This appears to be a placeholder or misconfigured URL.\n"
+                f"Fix: Remove this environment variable and use the default URL."
             )
 
     # ===== DATABASE =====
