@@ -353,7 +353,7 @@ ENVY_CHAT_NODE = {
             "displayName": "Stream Response",
             "name": "stream",
             "type": "boolean",
-            "default": False,
+            "default": False,  # Will be converted to false in JSON
             "description": "Whether to stream the response"
         }
     ]
