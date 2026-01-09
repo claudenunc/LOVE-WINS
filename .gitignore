@@ -50,7 +50,7 @@ Thumbs.db
 htmlcov/
 
 # Local data
-memory/
+/memory/
 *.json
 !package.json
 
