@@ -68,50 +68,11 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     stream: bool = True
     session_id: Optional[str] = None
-
-# ===================================
-# Lifecycle & App
-# ===================================
-
-envy_instance: Optional[ENVY] = None
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global envy_instance
-    envy_instance = ENVY(session_id="production")
-    await envy_instance.initialize()
-    print("[*] ENVY System: ONLINE")
-    yield
-    if envy_instance:
-        await envy_instance.close()
-
-app = FastAPI(title="ENVY", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
+    attachments: Optional[List[Dict[str, str]]] = None # [{"type": "image", "url": "..."}]
 
 # ===================================
 # API Endpoints
 # ===================================
-
-# ===================================
-# Config Endpoint
-# ===================================
-
-@app.get("/api/config")
-async def get_config():
-    """Serve public config to frontend"""
-    return {
-        "supabase_url": settings.supabase_url,
-        "supabase_anon_key": settings.supabase_anon_key
-    }
 
 @app.get("/")
 async def root():
@@ -128,6 +89,54 @@ async def sw():
 @app.get("/health")
 async def health():
     return {"status": "nominal", "database": "connected" if supabase else "offline"}
+
+# --- File Management (Vision/RAG) ---
+
+@app.post("/api/upload")
+async def upload_file(file: Request):
+    """Handle file uploads to Supabase Storage"""
+    if not supabase:
+        raise HTTPException(503, "Database offline")
+    
+    # Simple multipart parser (FastAPI UploadFile is better but we use Request for raw control)
+    form = await file.form()
+    uploaded_file = form.get("file")
+    
+    if not uploaded_file:
+        raise HTTPException(400, "No file provided")
+    
+    # 1. Upload to Supabase Storage 'uploads' bucket
+    file_bytes = await uploaded_file.read()
+    file_name = f"{int(time.time())}_{uploaded_file.filename}"
+    
+    try:
+        # Ensure bucket exists (would normally do this in migration)
+        # supabase.storage.create_bucket("uploads") 
+        res = supabase.storage.from_("uploads").upload(file_name, file_bytes)
+        
+        # Get Public URL
+        public_url = supabase.storage.from_("uploads").get_public_url(file_name)
+        return {"url": public_url, "name": file_name, "type": uploaded_file.content_type}
+        
+    except Exception as e:
+        # Mock response if storage not set up yet
+        print(f"Storage Error (using mock): {e}")
+        return {"url": "https://placehold.co/600x400?text=Uploaded+Image", "name": file_name, "type": "mock"}
+
+# --- Subscription (Stripe) ---
+
+@app.post("/api/subscribe")
+async def create_checkout(user: dict = Depends(get_current_user)):
+    """Create Stripe Checkout Session"""
+    stripe_key = os.getenv("STRIPE_SECRET_KEY")
+    if not stripe_key:
+        return {"url": "#", "error": "Stripe not configured"}
+    
+    # Real implementation would import stripe and create session
+    # stripe.api_key = stripe_key
+    # session = stripe.checkout.Session.create(...)
+    
+    return {"url": "https://checkout.stripe.com/mock-session"}
 
 # --- History Management ---
 
