@@ -41,16 +41,6 @@ security = HTTPBearer()
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """Bypass Auth for Founder Mode"""
     return {"id": "founder", "email": "nathan@foolishnessenvy.com"}
-    
-    try:
-        user = supabase.auth.get_user(token)
-        return user.user
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
 # ===================================
 # Pydantic Models
@@ -68,161 +58,18 @@ class ChatRequest(BaseModel):
     attachments: Optional[List[Dict[str, str]]] = None # [{"type": "image", "url": "..."}]
 
 # ===================================
-# API Endpoints
+# Lifecycle & App
 # ===================================
 
-@app.get("/")
-async def root():
-    return FileResponse("static/index.html")
+envy_instance: Optional[ENVY] = None
 
-@app.get("/manifest.json")
-async def manifest():
-    return FileResponse("static/manifest.json", media_type="application/json")
-
-@app.get("/sw.js")
-async def sw():
-    return FileResponse("static/sw.js", media_type="application/javascript")
-
-@app.get("/health")
-async def health():
-    return {"status": "nominal", "database": "connected" if supabase else "offline"}
-
-# --- File Management (Vision/RAG) ---
-
-@app.post("/api/upload")
-async def upload_file(file: Request):
-    """Handle file uploads to Supabase Storage"""
-    if not supabase:
-        raise HTTPException(503, "Database offline")
-    
-    # Simple multipart parser (FastAPI UploadFile is better but we use Request for raw control)
-    form = await file.form()
-    uploaded_file = form.get("file")
-    
-    if not uploaded_file:
-        raise HTTPException(400, "No file provided")
-    
-    # 1. Upload to Supabase Storage 'uploads' bucket
-    file_bytes = await uploaded_file.read()
-    file_name = f"{int(time.time())}_{uploaded_file.filename}"
-    
-    try:
-        # Ensure bucket exists (would normally do this in migration)
-        # supabase.storage.create_bucket("uploads") 
-        res = supabase.storage.from_("uploads").upload(file_name, file_bytes)
-        
-        # Get Public URL
-        public_url = supabase.storage.from_("uploads").get_public_url(file_name)
-        return {"url": public_url, "name": file_name, "type": uploaded_file.content_type}
-        
-    except Exception as e:
-        # Mock response if storage not set up yet
-        print(f"Storage Error (using mock): {e}")
-        return {"url": "https://placehold.co/600x400?text=Uploaded+Image", "name": file_name, "type": "mock"}
-
-# --- Subscription (Stripe) ---
-
-STRIPE_ENABLED = False # Set to True when ready to enable payments
-
-@app.post("/api/subscribe")
-async def create_checkout(user: dict = Depends(get_current_user)):
-    """Create Stripe Checkout Session (Standby Mode)"""
-    if not STRIPE_ENABLED:
-        return {"url": "#", "message": "Subscription system is in standby mode."}
-        
-    stripe_key = os.getenv("STRIPE_SECRET_KEY")
-    if not stripe_key:
-        return {"url": "#", "error": "Stripe keys not found in environment."}
-    
-    import stripe
-    stripe.api_key = stripe_key
-    
-    try:
-        # Note: You need to create a Price ID in your Stripe Dashboard first
-        price_id = os.getenv("STRIPE_PRICE_ID", "price_default")
-        
-        session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price': price_id,
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url=f"{settings.app_url}/?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.app_url}/",
-            customer_email=user.get("email"),
-            client_reference_id=user.get("id")
-        )
-        return {"url": session.url}
-    except Exception as e:
-        return {"url": "#", "error": str(e)}
-
-# --- History Management ---
-
-@app.get("/api/history")
-async def get_history(user: dict = Depends(get_current_user)):
-    """Fetch chat sessions for the user"""
-    if not supabase:
-        return []
-    
-    # Query 'sessions' table
-    try:
-        res = supabase.table("sessions").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
-        return res.data
-    except Exception as e:
-        print(f"DB Error: {e}")
-        return []
-
-@app.get("/api/history/{session_id}")
-async def get_chat_details(session_id: str, user: dict = Depends(get_current_user)):
-    """Fetch messages for a specific session"""
-    if not supabase:
-        return []
-    
-    try:
-        res = supabase.table("messages").select("*").eq("session_id", session_id).order("created_at").execute()
-        return res.data
-    except Exception:
-        return []
-
-# --- Chat Generation ---
-
-@app.post("/v1/chat/completions/stream")
-async def chat_stream(request: ChatRequest):
-    """High-performance ReAct streaming endpoint with Artifacts support"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("\n>>> DEPLOYMENT: NO-AUTH v4.0 (Cache Buster) <<<\n")
     global envy_instance
-    
-    if not envy_instance:
-        raise HTTPException(503, "System initializing...")
-
-    user_msg = request.messages[-1].content
-    
-    async def generate():
-        try:
-            # We use the ReAct loop but adapt it for streaming the intermediate tokens
-            # For simplicity in this fix, we will build the prompt and stream tokens directly
-            # including the artifact instructions.
-            
-            system_prompt = envy_instance._build_system_prompt()
-            
-            async for chunk in envy_instance.llm.complete(
-                [{"role": "system", "content": system_prompt}, 
-                 {"role": "user", "content": user_msg}],
-                stream=True
-            ):
-                data = {
-                    "choices": [{"delta": {"content": chunk}}]
-                }
-                yield f"data: {json.dumps(data)}\n\n"
-            
-            yield "data: [DONE]\n\n"
-            
-        except Exception as e:
-            err = json.dumps({"error": str(e)})
-            yield f"data: {err}\n\n"
-
-    return StreamingResponse(generate(), media_type="text/event-stream")
-
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    envy_instance = ENVY(session_id="production")
+    await envy_instance.initialize()
+    print("[*] ENVY System: ONLINE")
+    yield
+    if envy_instance:
+        await envy_instance.close()
