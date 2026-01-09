@@ -172,9 +172,41 @@ async def get_personas():
         ]
     }
 
+def _get_error_troubleshooting(error_str: str) -> tuple[str, str]:
+    """
+    Parse error and return (cause, fix_instructions)
+    
+    This helper avoids code duplication between validation and streaming endpoints.
+    """
+    if "401" in error_str or "Unauthorized" in error_str or "authentication" in error_str.lower():
+        return (
+            "Invalid API key",
+            "Get a FREE Groq API key from: https://console.groq.com/keys\nOr try OpenRouter: https://openrouter.ai/keys"
+        )
+    elif "No address" in error_str or "connection" in error_str.lower() or "timeout" in error_str.lower():
+        return (
+            "Cannot reach LLM API (network/DNS issue)",
+            "1. Check your internet connection\n2. Verify Groq/OpenRouter services are up\n3. Wait a few minutes and try again"
+        )
+    elif "429" in error_str or "rate limit" in error_str.lower():
+        return (
+            "Rate limit exceeded",
+            "1. Groq free tier: 14,400 requests/day\n2. Wait for reset (24 hours)\n3. Or switch to OpenRouter"
+        )
+    else:
+        return (
+            "Unknown error",
+            f"1. Check server logs for details\n2. Verify API key: echo $GROQ_API_KEY\n3. See TROUBLESHOOTING.md"
+        )
+
 @app.get("/api/validate-key")
 async def validate_api_key():
-    """Validate that the API key works by making a test call"""
+    """
+    Validate that the API key works without consuming quota.
+    
+    Just checks if ENVY initialized successfully - actual validation happens
+    on first chat message to avoid wasting API calls.
+    """
     if not envy_instance:
         return {
             "valid": False,
@@ -182,32 +214,13 @@ async def validate_api_key():
             "fix": "Set GROQ_API_KEY or OPENROUTER_API_KEY environment variable"
         }
     
-    try:
-        # Make a minimal test call to verify the API key works
-        test_response = await envy_instance.process("test")
-        return {
-            "valid": True,
-            "provider": "groq" if settings.has_groq else "openrouter",
-            "model": settings.groq_model if settings.has_groq else settings.openrouter_model
-        }
-    except Exception as e:
-        error_str = str(e)
-        fix_message = "Unknown error"
-        
-        if "401" in error_str or "Unauthorized" in error_str:
-            fix_message = "API key is invalid. Get a new one from https://console.groq.com/keys or https://openrouter.ai/keys"
-        elif "No address" in error_str or "connection" in error_str.lower():
-            fix_message = "Cannot reach API server. Check internet connection or try again later."
-        elif "429" in error_str or "rate limit" in error_str.lower():
-            fix_message = "Rate limit exceeded. Wait and try again or use a different API key."
-        else:
-            fix_message = f"Error: {error_str}"
-        
-        return {
-            "valid": False,
-            "error": error_str,
-            "fix": fix_message
-        }
+    # ENVY initialized successfully means API key is configured
+    # We don't make a test call here to avoid wasting quota
+    return {
+        "valid": True,
+        "provider": "groq" if settings.has_groq else "openrouter",
+        "model": settings.groq_model if settings.has_groq else settings.openrouter_model
+    }
 
 @app.post("/v1/chat/completions")
 async def chat_completion(request: ChatRequest):
@@ -281,33 +294,11 @@ async def chat_completion_stream(request: ChatRequest):
             yield "data: [DONE]\n\n"
         except Exception as e:
             error_str = str(e)
-            error_msg = f"⚠️ **Error:** {error_str}\n\n"
+            cause, fix = _get_error_troubleshooting(error_str)
             
-            # Provide specific troubleshooting based on error type
-            if "401" in error_str or "Unauthorized" in error_str or "authentication" in error_str.lower():
-                error_msg += "**Cause:** Invalid API key\n\n"
-                error_msg += "**Fix:**\n"
-                error_msg += "1. Get a FREE Groq API key from: https://console.groq.com/keys\n"
-                error_msg += "2. On Render: Dashboard → Your Service → Environment → Add `GROQ_API_KEY`\n"
-                error_msg += "3. Or try OpenRouter: Get key from https://openrouter.ai/keys → Set `OPENROUTER_API_KEY`\n"
-            elif "No address" in error_str or "connection" in error_str.lower() or "timeout" in error_str.lower():
-                error_msg += "**Cause:** Cannot reach LLM API (network/DNS issue)\n\n"
-                error_msg += "**Fix:**\n"
-                error_msg += "1. Check your internet connection\n"
-                error_msg += "2. Verify Groq/OpenRouter services are up (status pages)\n"
-                error_msg += "3. On Render: Check service logs for network errors\n"
-                error_msg += "4. Wait a few minutes and try again\n"
-            elif "429" in error_str or "rate limit" in error_str.lower():
-                error_msg += "**Cause:** Rate limit exceeded\n\n"
-                error_msg += "**Fix:**\n"
-                error_msg += "1. Groq free tier: 14,400 requests/day limit\n"
-                error_msg += "2. Wait for rate limit to reset (usually 24 hours)\n"
-                error_msg += "3. Or switch to OpenRouter API (different limits)\n"
-            else:
-                error_msg += "**Troubleshooting:**\n"
-                error_msg += "1. Check server logs for details\n"
-                error_msg += "2. Verify API key is valid: `echo $GROQ_API_KEY`\n"
-                error_msg += "3. See TROUBLESHOOTING.md for more help\n"
+            error_msg = f"⚠️ **Error:** {error_str}\n\n"
+            error_msg += f"**Cause:** {cause}\n\n"
+            error_msg += f"**Fix:**\n{fix}\n"
             
             error_data = {
                 "id": f"chatcmpl-{int(time.time())}",
