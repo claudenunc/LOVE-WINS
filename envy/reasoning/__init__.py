@@ -12,7 +12,7 @@ Advanced reasoning techniques for ENVY:
 from .tree_of_thoughts import TreeOfThoughts
 from .chain_of_thought import ChainOfThought
 from .self_critique import SelfCritique
-from .orchestrator import ReasoningOrchestrator
+from .reasoning_coordinator import ReasoningOrchestrator
 
 __all__ = [
     "TreeOfThoughts",

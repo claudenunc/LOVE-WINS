@@ -28,7 +28,7 @@ from .memory.memory_manager import MemoryManager
 from .personas.persona_router import PersonaRouter
 from .personas.persona_definitions import PERSONAS, Persona
 
-from .reasoning.orchestrator import ReasoningOrchestrator
+from .reasoning.reasoning_coordinator import ReasoningOrchestrator
 from .reflexion.reflexion_loop import ReflexionLoop, TaskResult
 from .reflexion.metacognition import MetacognitionCheck
 

@@ -1,8 +1,9 @@
 """
-Reasoning Orchestrator
+Reasoning Coordinator
 =====================
 Coordinates all reasoning strategies, deciding which to use based on message complexity.
 
+Renamed from orchestrator.py to avoid naming collision with orchestration/orchestrator.py.
 Based on existing code from PODCASTS/ENVY-SYSTEM/OPENSOURCE-ENVY/reasoning.py
 """
 
