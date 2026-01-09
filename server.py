@@ -262,7 +262,7 @@ def validate_uuid(value: str, param_name: str = "ID") -> None:
     """
     try:
         UUID(value)
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, TypeError):
         raise HTTPException(
             status_code=400,
             detail=f"Invalid {param_name} format: '{value}'. Expected a valid UUID."

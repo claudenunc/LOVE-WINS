@@ -369,7 +369,7 @@
                     if (isValidProjectId(data.id)) {
                         await fetch('/api/projects/' + data.id + '/activate', {method: 'POST'});
                     } else {
-                        console.error('Cannot activate project: Invalid project ID', data.id);
+                        console.error('Cannot activate project: Invalid project ID', data.id, '- Please refresh the page or contact support');
                     }
                 } else {
                     state.activeProject = data; // Ensure correct structure
@@ -393,7 +393,7 @@
         async function loadProjectFiles(projectId) {
             // Validate project ID before making API call
             if (!isValidProjectId(projectId)) {
-                console.error('Cannot load project files: Invalid project ID', projectId);
+                console.error('Cannot load project files: Invalid project ID', projectId, '- Project list may not display correctly');
                 return;
             }
             
