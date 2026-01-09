@@ -10,6 +10,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import Field, model_validator
 from typing import Optional
+from urllib.parse import urlparse
 
 
 class Settings(BaseSettings):
