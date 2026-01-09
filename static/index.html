@@ -196,6 +196,27 @@
         let currentArtifactLang = "";
         let isGenerating = false;
 
+        // Check server status on load
+        async function checkServerStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                if (!data.ready) {
+                    console.warn('Server not ready:', data.error);
+                    // Show warning in UI if configured incorrectly
+                    if (!data.groq_configured && !data.openrouter_configured) {
+                        const warning = document.createElement('div');
+                        warning.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-orange-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                        warning.innerHTML = '⚠️ API keys not configured. Please set GROQ_API_KEY or OPENROUTER_API_KEY';
+                        document.body.appendChild(warning);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to check server status:', err);
+            }
+        }
+        checkServerStatus();
+
         // --- ARTIFACT RENDERING ---
         function renderArtifact(code, lang) {
             currentArtifactCode = code;
@@ -266,6 +287,10 @@
                     })
                 });
 
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let fullText = "";
@@ -311,7 +336,9 @@
                     }
                 }
             } catch (err) {
-                console.error(err);
+                console.error('Chat error:', err);
+                const aiDiv = document.getElementById(aiId).querySelector('.prose');
+                aiDiv.innerHTML = marked.parse(`⚠️ **Error**: ${err.message || 'Failed to connect to server. Please check if the server is running and API keys are configured.'}`);
             } finally {
                 isGenerating = false;
             }
