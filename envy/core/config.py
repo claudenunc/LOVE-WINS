@@ -93,6 +93,11 @@ class Settings(BaseSettings):
     def clean_api_keys(self):
         if self.groq_api_key: self.groq_api_key = self.groq_api_key.strip()
         if self.openrouter_api_key: self.openrouter_api_key = self.openrouter_api_key.strip()
+        # Strip whitespace/newlines from service URLs to avoid InvalidURL errors
+        if self.supabase_url: self.supabase_url = self.supabase_url.strip()
+        if self.groq_api_url: self.groq_api_url = self.groq_api_url.strip()
+        if self.openrouter_api_url: self.openrouter_api_url = self.openrouter_api_url.strip()
+        if self.dify_url: self.dify_url = self.dify_url.strip()
         # Validate common service URLs to fail fast on malformed values
         def _valid_url(v: Optional[str]) -> bool:
             if not v:
