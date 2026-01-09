@@ -257,7 +257,7 @@ class KnowledgeSpine:
         with open(log_path, 'r') as f:
             for line in f:
                 if line.strip():
-                    entries.append(json.load(line))
+                    entries.append(json.loads(line))  # Fixed: use json.loads() not json.load()
         
         return entries
     
