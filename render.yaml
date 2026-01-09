@@ -1,28 +1,109 @@
-# Render Blueprint for ENVY
-# Deploy with: Create New > Blueprint > Connect repo
-# https://render.com/docs/blueprint-spec
+# ============================================================================
+# Render Blueprint for ENVY - Zero-Cost Intelligent Application Architecture
+# ============================================================================
+# Deploy: Render Dashboard → New → Blueprint → Connect this GitHub repo
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This configuration deploys a production-ready Claude.ai alternative with:
+# - Multi-agent orchestration (Architect, Builder, Scribe, Curator, Guardian, Continuity)
+# - Builder Suite (n8n workflows, websites, apps, automations)
+# - MCP protocol support for autonomous digital twins
+# - Knowledge Spine for persistent memory
+# - No authentication required (open-source, subscription-free)
+# ============================================================================
 
 services:
   - type: web
-    name: envy-api
+    name: envy-polymorphic-intelligence
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: GROQ_API_KEY
-        sync: false  # Set manually in Render dashboard
-      - key: OPENROUTER_API_KEY
-        sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_URL
-        sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_ANON_KEY
-        sync: false  # Set manually in Render dashboard
-      - key: PYTHON_VERSION
-        value: "3.11.0"
-    healthCheckPath: /health
-    autoDeploy: true
-    plan: free  # or starter ($7/mo) for always-on
+    region: oregon  # Free tier available
     
-    # Optional: Custom domain
+    # Build Configuration
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    
+    # Start Command (uvicorn for production with workers)
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT --workers 1
+    
+    # Environment Variables
+    envVars:
+      # ===== REQUIRED: AI Inference Layer =====
+      - key: GROQ_API_KEY
+        sync: false  # Set in Render dashboard: Settings → Environment
+        # Get free key: https://console.groq.com/keys
+        # Provides: Llama-3, Mixtral models (free tier)
+      
+      # ===== ALTERNATIVE: OpenRouter API =====
+      - key: OPENROUTER_API_KEY
+        sync: false
+        # Get key: https://openrouter.ai/keys
+        # Provides: 100+ models including Claude, GPT-4, etc.
+      
+      # ===== OPTIONAL: Database & Storage =====
+      - key: SUPABASE_URL
+        sync: false
+        # Optional Supabase for persistent storage
+        # Free tier: https://supabase.com/dashboard/projects
+      
+      - key: SUPABASE_ANON_KEY
+        sync: false
+        # Supabase anonymous key (public, safe to expose)
+      
+      # ===== SYSTEM CONFIGURATION =====
+      - key: PYTHON_VERSION
+        value: "3.11"
+      
+      - key: PORT
+        value: "8000"
+      
+      - key: ENVIRONMENT
+        value: "production"
+    
+    # Health Check
+    healthCheckPath: /health
+    
+    # Auto-deploy on git push
+    autoDeploy: true
+    
+    # Free Tier Plan (or upgrade to Starter $7/mo for always-on)
+    plan: free
+    
+    # Disk storage (optional - for Knowledge Spine persistence)
+    # Free tier gets ephemeral storage; upgrade for persistent disk
+    # disk:
+    #   name: envy-knowledge-spine
+    #   mountPath: /opt/render/project/src/memory
+    #   sizeGB: 1
+    
+    # Custom Domains (optional)
+    # Uncomment and configure after deployment
     # domains:
-    #   - envy-api.love-wins.ai
+    #   - envy.your-domain.com
+    
+    # Additional Settings
+    # Note: Free tier may spin down after 15min inactivity
+    # Use a cron job or uptimerobot.com to keep it warm
+
+# ============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ============================================================================
+# 
+# 1. Push this repo to GitHub
+# 2. Go to https://dashboard.render.com/
+# 3. Click "New" → "Blueprint"
+# 4. Connect your GitHub repo
+# 5. Render will auto-detect this render.yaml
+# 6. Set required environment variables:
+#    - GROQ_API_KEY (get from https://console.groq.com/keys)
+# 7. Click "Apply" to deploy
+# 8. Access your app at: https://envy-polymorphic-intelligence.onrender.com
+#
+# OPTIONAL ENHANCEMENTS:
+# - Add custom domain in Render settings
+# - Enable Supabase for persistence (free tier available)
+# - Set up n8n webhooks pointing to your Render URL
+# - Use /api/blueprint/execute to trigger Architect → Builder → Scribe pipelines
+#
+# ZERO-COST ARCHITECTURE ACHIEVED ✓
+# ============================================================================
