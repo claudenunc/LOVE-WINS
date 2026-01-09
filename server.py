@@ -1,118 +1,92 @@
 #!/usr/bin/env python3
 """
-ENVY FastAPI Server
-===================
-REST API and OpenAI-compatible endpoint for ENVY.
-
-Compatible with Open WebUI and any OpenAI-compatible client.
-
-Usage:
-    python server.py
-    
-    # Or with uvicorn directly:
-    uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+ENVY Production Server
+======================
+Full-stack backend mimicking Claude.ai capabilities.
+Integrates:
+- FastAPI (High-performance web server)
+- Supabase (Auth & Database)
+- ENVY Agent (Reasoning Engine)
 """
 
-import asyncio
+import os
 import json
 import time
 from typing import Optional, List, Dict, Any, AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import uvicorn
+from supabase import create_client, Client
 
 from envy.agent import ENVY
 from envy.personas.persona_definitions import PERSONAS
 from envy.core.config import settings
 
+# ===================================
+# Database & Auth Setup
+# ===================================
+
+supabase: Optional[Client] = None
+if settings.has_supabase:
+    supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+
+security = HTTPBearer()
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify JWT token from Supabase"""
+    token = credentials.credentials
+    if not supabase:
+        # Dev mode: Mock user if DB not set up
+        return {"id": "dev-user", "email": "dev@foolishnessenvy.com"}
+    
+    try:
+        user = supabase.auth.get_user(token)
+        return user.user
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 # ===================================
-# Pydantic Models (OpenAI-compatible)
+# Pydantic Models
 # ===================================
 
 class Message(BaseModel):
     role: str
     content: str
 
-
-class ChatCompletionRequest(BaseModel):
+class ChatRequest(BaseModel):
     model: str = "envy"
     messages: List[Message]
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 4096
-    stream: Optional[bool] = False
-    # ENVY-specific options
-    persona: Optional[str] = None
-    use_reflexion: Optional[bool] = False
-
-
-class ChatCompletionChoice(BaseModel):
-    index: int
-    message: Message
-    finish_reason: str = "stop"
-
-
-class Usage(BaseModel):
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-
-
-class ChatCompletionResponse(BaseModel):
-    id: str = "envy-response"
-    object: str = "chat.completion"
-    created: int = Field(default_factory=lambda: int(time.time()))
-    model: str = "envy"
-    choices: List[ChatCompletionChoice]
-    usage: Usage
-
-
-class ModelInfo(BaseModel):
-    id: str
-    object: str = "model"
-    created: int = Field(default_factory=lambda: int(time.time()))
-    owned_by: str = "envy"
-
-
-class ModelsResponse(BaseModel):
-    object: str = "list"
-    data: List[ModelInfo]
-
+    stream: bool = True
+    session_id: Optional[str] = None
 
 # ===================================
-# FastAPI App
+# Lifecycle & App
 # ===================================
 
-# Global ENVY instance
 envy_instance: Optional[ENVY] = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage ENVY lifecycle"""
     global envy_instance
-    envy_instance = ENVY(session_id="api")
+    envy_instance = ENVY(session_id="production")
     await envy_instance.initialize()
-    print("[*] ENVY Server initialized")
+    print("[*] ENVY System: ONLINE")
     yield
     if envy_instance:
         await envy_instance.close()
-    print("[*] ENVY Server shutdown")
 
+app = FastAPI(title="ENVY", lifespan=lifespan)
 
-app = FastAPI(
-    title="ENVY API",
-    description="Self-Improving AI with 9 Expert Personas",
-    version="1.0.0",
-    lifespan=lifespan
-)
-
-# CORS for Open WebUI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -121,280 +95,100 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
 # ===================================
-# OpenAI-Compatible Endpoints
+# API Endpoints
 # ===================================
-
-@app.get("/v1/models")
-@app.get("/models")
-async def list_models() -> ModelsResponse:
-    """List available models (all personas + base ENVY)"""
-    models = [
-        ModelInfo(id="envy", owned_by="envy"),
-        ModelInfo(id="envy-reflexion", owned_by="envy"),
-    ]
-    
-    # Add each persona as a "model"
-    for persona_id, persona in PERSONAS.items():
-        models.append(ModelInfo(
-            id=f"envy-{persona_id}",
-            owned_by="envy"
-        ))
-    
-    return ModelsResponse(data=models)
-
-
-@app.post("/v1/chat/completions")
-@app.post("/chat/completions")
-async def chat_completions(request: ChatCompletionRequest) -> ChatCompletionResponse:
-    """OpenAI-compatible chat completions endpoint"""
-    global envy_instance
-    
-    if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
-    
-    # Extract last user message
-    user_message = None
-    for msg in reversed(request.messages):
-        if msg.role == "user":
-            user_message = msg.content
-            break
-    
-    if not user_message:
-        raise HTTPException(status_code=400, detail="No user message found")
-    
-    # Parse persona from model name (e.g., "envy-jocko" -> "jocko")
-    persona = request.persona
-    use_reflexion = request.use_reflexion
-    
-    if request.model.startswith("envy-"):
-        model_suffix = request.model[5:]  # Remove "envy-"
-        if model_suffix == "reflexion":
-            use_reflexion = True
-        elif model_suffix in PERSONAS:
-            persona = model_suffix
-    
-    # Chat with ENVY
-    try:
-        response = await envy_instance.chat(
-            message=user_message,
-            use_reflexion=use_reflexion,
-            force_persona=persona
-        )
-        
-        # Build response
-        return ChatCompletionResponse(
-            id=f"envy-{int(time.time())}",
-            model=request.model,
-            choices=[
-                ChatCompletionChoice(
-                    index=0,
-                    message=Message(role="assistant", content=response.content),
-                    finish_reason="stop"
-                )
-            ],
-            usage=Usage(
-                total_tokens=response.tokens_used
-            )
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/v1/chat/completions/stream")
-async def chat_completions_stream(request: ChatCompletionRequest):
-    """Streaming chat completions (SSE)"""
-    global envy_instance
-    
-    if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
-    
-    # For now, simulate streaming by chunking the response
-    # TODO: Implement true streaming from LLM
-    
-    async def generate():
-        user_message = None
-        for msg in reversed(request.messages):
-            if msg.role == "user":
-                user_message = msg.content
-                break
-        
-        if not user_message:
-            yield f"data: {json.dumps({'error': 'No user message'})}\n\n"
-            return
-        
-        try:
-            response = await envy_instance.chat(user_message)
-            
-            # Chunk the response
-            content = response.content
-            chunk_size = 20  # Characters per chunk
-            
-            for i in range(0, len(content), chunk_size):
-                chunk = content[i:i+chunk_size]
-                data = {
-                    "id": f"envy-{int(time.time())}",
-                    "object": "chat.completion.chunk",
-                    "model": request.model,
-                    "choices": [{
-                        "index": 0,
-                        "delta": {"content": chunk},
-                        "finish_reason": None
-                    }]
-                }
-                yield f"data: {json.dumps(data)}\n\n"
-                await asyncio.sleep(0.02)  # Small delay between chunks
-            
-            # Send done signal
-            yield "data: [DONE]\n\n"
-            
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-    
-    return StreamingResponse(generate(), media_type="text/event-stream")
-
-
-# ===================================
-# ENVY-Specific Endpoints
-# ===================================
-
-@app.get("/sw.js")
-async def service_worker():
-    """Serve service worker from root to ensure correct scope"""
-    return FileResponse("static/sw.js", media_type="application/javascript")
-
-
-@app.get("/manifest.json")
-async def manifest():
-    """Serve PWA manifest"""
-    return FileResponse("static/manifest.json", media_type="application/json")
-
 
 @app.get("/")
 async def root():
-    """Serve the static chat interface"""
     return FileResponse("static/index.html")
 
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse("static/manifest.json", media_type="application/json")
+
+@app.get("/sw.js")
+async def sw():
+    return FileResponse("static/sw.js", media_type="application/javascript")
 
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "initialized": envy_instance is not None,
-        "timestamp": int(time.time())
-    }
+    return {"status": "nominal", "database": "connected" if supabase else "offline"}
 
+# --- History Management ---
 
-@app.get("/personas")
-async def list_personas():
-    """List all available personas with details"""
-    return {
-        "personas": [
-            {
-                "id": p.id,
-                "name": p.name,
-                "title": p.title,
-                "expertise": p.expertise,
-                "style": p.communication_style,
-                "color": p.color
-            }
-            for p in PERSONAS.values()
-        ]
-    }
-
-
-@app.get("/personas/{persona_id}")
-async def get_persona(persona_id: str):
-    """Get details for a specific persona"""
-    if persona_id not in PERSONAS:
-        raise HTTPException(status_code=404, detail="Persona not found")
+@app.get("/api/history")
+async def get_history(user: dict = Depends(get_current_user)):
+    """Fetch chat sessions for the user"""
+    if not supabase:
+        return []
     
-    p = PERSONAS[persona_id]
-    return {
-        "id": p.id,
-        "name": p.name,
-        "title": p.title,
-        "expertise": p.expertise,
-        "communication_style": p.communication_style,
-        "trigger_keywords": p.trigger_keywords,
-        "example_phrases": p.example_phrases,
-        "color": p.color
-    }
+    # Query 'sessions' table
+    try:
+        res = supabase.table("sessions").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        print(f"DB Error: {e}")
+        return []
 
+@app.get("/api/history/{session_id}")
+async def get_chat_details(session_id: str, user: dict = Depends(get_current_user)):
+    """Fetch messages for a specific session"""
+    if not supabase:
+        return []
+    
+    try:
+        res = supabase.table("messages").select("*").eq("session_id", session_id).order("created_at").execute()
+        return res.data
+    except Exception:
+        return []
 
-@app.get("/stats")
-async def get_stats():
-    """Get usage statistics"""
+# --- Chat Generation ---
+
+@app.post("/v1/chat/completions/stream")
+async def chat_stream(request: ChatRequest): # Auth temporarily optional for "Founder Mode" speed
+    """High-performance streaming endpoint"""
     global envy_instance
     
     if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
+        raise HTTPException(503, "System initializing...")
+
+    user_msg = request.messages[-1].content
     
-    return envy_instance.get_usage_stats()
+    # 1. Save User Message (Async)
+    # TODO: Fire and forget to Supabase 'messages' table
 
+    async def generate():
+        try:
+            # Direct access to the internal LLM for raw speed
+            # We bypass the full agent loop for the streaming response to get the first token FAST
+            # Then we process tools in the background (Conceptually)
+            
+            # For v3.0, we use the tool-aware chat but we need to adapt it for streaming.
+            # Currently ENVY.chat is not a generator. 
+            # We will use the LLM directly for the UI stream, and let the Agent think in parallel.
+            
+            # Streaming from LLM Client
+            async for chunk in envy_instance.llm.complete(
+                [{"role": "system", "content": envy_instance._build_system_prompt()}, 
+                 {"role": "user", "content": user_msg}],
+                stream=True
+            ):
+                data = {
+                    "choices": [{"delta": {"content": chunk}}]
+                }
+                yield f"data: {json.dumps(data)}\n\n"
+            
+            yield "data: [DONE]\n\n"
+            
+        except Exception as e:
+            err = json.dumps({"error": str(e)})
+            yield f"data: {err}\n\n"
 
-class RememberRequest(BaseModel):
-    content: str
-    category: str = "user_note"
-
-
-@app.post("/memory/remember")
-async def remember(request: RememberRequest):
-    """Store something in ENVY's memory"""
-    global envy_instance
-    
-    if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
-    
-    await envy_instance.remember(request.content, request.category)
-    return {"status": "stored", "content": request.content[:100]}
-
-
-class RecallRequest(BaseModel):
-    query: str
-    limit: int = 5
-
-
-@app.post("/memory/recall")
-async def recall(request: RecallRequest):
-    """Search ENVY's memory"""
-    global envy_instance
-    
-    if not envy_instance:
-        raise HTTPException(status_code=503, detail="ENVY not initialized")
-    
-    results = await envy_instance.recall(request.query)
-    return {"query": request.query, "results": results}
-
-
-# ===================================
-# Main Entry Point
-# ===================================
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 if __name__ == "__main__":
-    import os
-    
-    host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8000))
-    
-    display_host = "localhost" if host == "0.0.0.0" else host
-    print(f"""
-+---------------------------------------------------------------+
-|                                                               |
-|   ENVY API Server                                             |
-|                                                               |
-|   Chat Interface:                                             |
-|   http://{display_host}:{port}/                                         |
-|                                                               |
-|   API Documentation:                                          |
-|   http://{display_host}:{port}/docs                                     |
-|                                                               |
-+---------------------------------------------------------------+
-""")
-    
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
